@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ customer.name }} - Customer Detail{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-user text-primary"></i> {{ customer.name }}</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="{% url 'customer_list' %}" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to List
+            </a>
+            <a href="{% url 'customer_edit' customer.id %}" class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+            <a href="{% url 'customer_delete' customer.id %}" class="btn btn-sm btn-outline-danger">
+                <i class="fas fa-trash"></i> Delete
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Customer Info Card -->
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i> Customer Information</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Name</dt>
+                    <dd class="col-sm-8">{{ customer.name }}</dd>
+                    
+                    <dt class="col-sm-4">Phone</dt>
+                    <dd class="col-sm-8">{{ customer.phone|default:"Not provided" }}</dd>
+                    
+                    <dt class="col-sm-4">Address</dt>
+                    <dd class="col-sm-8">{{ customer.address|default:"Not provided"|linebreaksbr }}</dd>
+                    
+                    <dt class="col-sm-4">Joined On</dt>
+                    <dd class="col-sm-8">{{ customer.date_joined|date:"d M, Y" }}</dd>
+                    
+                    <dt class="col-sm-4">Milk Types</dt>
+                    <dd class="col-sm-8">
+                        {% for milk_type in customer.milk_types.all %}
+                        <span class="badge bg-success">{{ milk_type.name }} (₹{{ milk_type.rate_per_liter }}/L)</span>
+                        {% empty %}
+                        <span class="badge bg-light text-dark">None Selected</span>
+                        {% endfor %}
+                    </dd>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Balance Card -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-balance-scale me-2"></i> Balance</h5>
+            </div>
+            <div class="card-body text-center">
+                <h3 class="{% if balance > 0 %}balance-positive{% else %}balance-negative{% endif %}">
+                    ₹{{ balance|floatformat:2 }}
+                </h3>
+                <p class="text-muted mb-0">
+                    {% if balance > 0 %}
+                    Amount to be received from customer
+                    {% elif balance < 0 %}
+                    Advance payment from customer
+                    {% else %}
+                    No pending balance
+                    {% endif %}
+                </p>
+                
+                <div class="btn-group mt-3">
+                    <a href="{% url 'sale_add' %}?customer={{ customer.id }}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus-circle"></i> Record Sale
+                    </a>
+                    <a href="{% url 'payment_add' %}?customer={{ customer.id }}" class="btn btn-sm btn-accent">
+                        <i class="fas fa-money-bill"></i> Record Payment
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <!-- Recent Sales -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-milk me-2"></i> Recent Sales</h5>
+                <a href="{% url 'sale_add' %}?customer={{ customer.id }}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-plus-circle"></i> New Sale
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_sales %}
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Milk Type</th>
+                                <th>Quantity</th>
+                                <th>Rate</th>
+                                <th>Amount</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sale in recent_sales %}
+                            <tr>
+                                <td>{{ sale.date|date:"d M, Y" }}</td>
+                                <td>{{ sale.milk_type.name }}</td>
+                                <td>{{ sale.quantity|floatformat:1 }} L</td>
+                                <td>₹{{ sale.rate|floatformat:2 }}</td>
+                                <td>₹{{ sale.total_amount|floatformat:2 }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'sale_edit' sale.id %}" class="btn btn-outline-primary">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="{% url 'sale_delete' sale.id %}" class="btn btn-outline-danger">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-milk fa-3x text-muted mb-3"></i>
+                    <p>No sales records found for this customer</p>
+                    <a href="{% url 'sale_add' %}?customer={{ customer.id }}" class="btn btn-primary">
+                        <i class="fas fa-plus-circle"></i> Record First Sale
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Recent Payments -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-money-bill me-2"></i> Recent Payments</h5>
+                <a href="{% url 'payment_add' %}?customer={{ customer.id }}" class="btn btn-sm btn-accent">
+                    <i class="fas fa-plus-circle"></i> New Payment
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_payments %}
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Description</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for payment in recent_payments %}
+                            <tr>
+                                <td>{{ payment.date|date:"d M, Y" }}</td>
+                                <td>₹{{ payment.amount|floatformat:2 }}</td>
+                                <td>{{ payment.description|default:"--" }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'payment_edit' payment.id %}" class="btn btn-outline-primary">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="{% url 'payment_delete' payment.id %}" class="btn btn-outline-danger">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-money-bill fa-3x text-muted mb-3"></i>
+                    <p>No payment records found for this customer</p>
+                    <a href="{% url 'payment_add' %}?customer={{ customer.id }}" class="btn btn-accent">
+                        <i class="fas fa-plus-circle"></i> Record First Payment
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
