@@ -18,6 +18,7 @@ from .forms import (
 )
 
 import re
+import datetime
 from datetime import timedelta
 from decimal import Decimal
 
@@ -156,6 +157,39 @@ class CustomerListView(LoginRequiredMixin, ListView):
     model = Customer
     template_name = 'dairy_app/customer_list.html'
     context_object_name = 'customers'
+    paginate_by = 25  # Show 25 customers per page
+    
+    def highlight_text(self, text, search_term):
+        """Helper method to highlight search term in text"""
+        if not search_term:
+            return text
+        
+        # Use case-insensitive replacement
+        search_term_lower = search_term.lower()
+        text_lower = text.lower()
+        
+        result = ""
+        last_end = 0
+        
+        # Find all occurrences of the search term and wrap them with highlight spans
+        start = text_lower.find(search_term_lower)
+        while start != -1:
+            # Add the text before the match
+            result += text[last_end:start]
+            
+            # Add the highlighted match
+            match_end = start + len(search_term)
+            result += f'<span class="search-highlight">{text[start:match_end]}</span>'
+            
+            # Move past this match
+            last_end = match_end
+            start = text_lower.find(search_term_lower, last_end)
+        
+        # Add any remaining text
+        if last_end < len(text):
+            result += text[last_end:]
+            
+        return result
     
     def get_queryset(self):
         queryset = Customer.objects.all()
@@ -179,21 +213,34 @@ class CustomerListView(LoginRequiredMixin, ListView):
         # Get all milk types for labeling
         all_milk_types = MilkType.objects.all()
         
-        # Process each customer
-        for customer in context['customers']:
-            # Calculate monthly milk delivery by type
-            milk_delivery = {}
-            monthly_sales = Sale.objects.filter(
-                customer=customer,
-                date__gte=start_of_month,
-                date__lte=today
-            ).values('milk_type__name').annotate(
-                total_quantity=Sum('quantity')
-            )
+        # Get all customer IDs from the current page
+        customer_ids = [customer.id for customer in context['customers']]
+        
+        # Get the monthly milk delivery data for just the customers on this page
+        monthly_sales = Sale.objects.filter(
+            customer_id__in=customer_ids,
+            date__gte=start_of_month,
+            date__lte=today
+        ).values('customer_id', 'milk_type__name').annotate(
+            total_quantity=Sum('quantity')
+        )
+        
+        # Organize sales by customer
+        milk_delivery_by_customer = {}
+        for sale in monthly_sales:
+            customer_id = sale['customer_id']
+            milk_type_name = sale['milk_type__name']
+            quantity = sale['total_quantity']
             
-            for sale in monthly_sales:
-                milk_type_name = sale['milk_type__name']
-                milk_delivery[milk_type_name] = sale['total_quantity']
+            if customer_id not in milk_delivery_by_customer:
+                milk_delivery_by_customer[customer_id] = {}
+            
+            milk_delivery_by_customer[customer_id][milk_type_name] = quantity
+        
+        # Get balance data for customers on current page
+        for customer in context['customers']:
+            # Get milk delivery data (already calculated)
+            milk_delivery = milk_delivery_by_customer.get(customer.id, {})
             
             # Calculate balance
             total_sales = Sale.objects.filter(customer=customer).aggregate(
@@ -211,10 +258,27 @@ class CustomerListView(LoginRequiredMixin, ListView):
                 'balance': balance
             }
         
+        # Get search query for highlighting
+        search_query = self.request.GET.get('search', '').strip()
+        
+        # Highlight customer names if there's a search query
+        if search_query:
+            for customer in context['customers']:
+                customer.highlighted_name = self.highlight_text(customer.name, search_query)
+        
+        # Add custom pagination information
+        page_obj = context['page_obj']
+        paginator = context['paginator']
+        
+        # Create a list of page numbers to display
+        page_range = list(paginator.get_elided_page_range(page_obj.number, on_each_side=2, on_ends=1))
+        
         context['customer_data'] = customer_data
         context['milk_types'] = all_milk_types
-        context['search_query'] = self.request.GET.get('search', '')
+        context['search_query'] = search_query
         context['current_month'] = today.strftime('%B %Y')
+        context['page_range'] = page_range
+        context['total_customers'] = paginator.count
         
         return context
         
@@ -224,18 +288,72 @@ class CustomerListView(LoginRequiredMixin, ListView):
                   request.GET.get('ajax_search') == 'true')
         
         if is_ajax:
-            # Use the normal queryset function to get filtered customers
+            # For AJAX requests, we need all matching customers, not just the current page
+            # This is to preserve the search functionality that works across all customers
             queryset = self.get_queryset()
+            search_query = request.GET.get('search', '').strip()
             
-            # Get context data for calculating milk delivery and balance
-            context = self.get_context_data(object_list=queryset)
-            customers_data = context['customers']
-            customer_data = context['customer_data']
+            # Calculate the data we need for display
+            today = timezone.now().date()
+            start_of_month = today.replace(day=1)
+            customer_data = {}
             
-            # Return only what we need for the response
+            # Get all matching customer IDs
+            customer_ids = list(queryset.values_list('id', flat=True))
+            
+            # Get the monthly milk delivery data in bulk
+            monthly_sales = Sale.objects.filter(
+                customer_id__in=customer_ids,
+                date__gte=start_of_month,
+                date__lte=today
+            ).values('customer_id', 'milk_type__name').annotate(
+                total_quantity=Sum('quantity')
+            )
+            
+            # Organize sales by customer
+            milk_delivery_by_customer = {}
+            for sale in monthly_sales:
+                customer_id = sale['customer_id']
+                milk_type_name = sale['milk_type__name']
+                quantity = sale['total_quantity']
+                
+                if customer_id not in milk_delivery_by_customer:
+                    milk_delivery_by_customer[customer_id] = {}
+                
+                milk_delivery_by_customer[customer_id][milk_type_name] = quantity
+            
+            # Get balance data for all matching customers in bulk
+            sales_by_customer = Sale.objects.filter(
+                customer_id__in=customer_ids
+            ).values('customer_id').annotate(
+                total=Sum(F('quantity') * F('rate'), output_field=DecimalField())
+            )
+            
+            payments_by_customer = Payment.objects.filter(
+                customer_id__in=customer_ids
+            ).values('customer_id').annotate(
+                total=Sum('amount')
+            )
+            
+            # Convert to dictionaries for faster lookup
+            sales_dict = {item['customer_id']: item['total'] for item in sales_by_customer}
+            payments_dict = {item['customer_id']: item['total'] for item in payments_by_customer}
+            
+            # Calculate balance for each customer
+            for customer_id in customer_ids:
+                total_sales = sales_dict.get(customer_id, 0) or 0
+                total_payments = payments_dict.get(customer_id, 0) or 0
+                balance = total_sales - total_payments
+                
+                customer_data[customer_id] = {
+                    'milk_delivery': milk_delivery_by_customer.get(customer_id, {}),
+                    'balance': balance
+                }
+            
+            # Format the response
             html_content = []
             
-            for idx, customer in enumerate(customers_data):
+            for idx, customer in enumerate(queryset):
                 # Format milk types
                 milk_types_html = ""
                 if customer.milk_types.exists():
@@ -257,11 +375,16 @@ class CustomerListView(LoginRequiredMixin, ListView):
                 balance_class = "bg-success" if balance > 0 else "bg-danger" if balance < 0 else "bg-light text-dark"
                 balance_html = f'<span class="badge {balance_class} fs-6">₹{balance:.2f}</span>'
                 
+                # Highlight the customer name if there's a search query
+                customer_name = customer.name
+                highlighted_name = self.highlight_text(customer_name, search_query) if search_query else customer_name
+                
                 # Create row
                 row = {
                     'counter': idx + 1,
                     'id': customer.id,
-                    'name': customer.name,
+                    'name': customer_name,
+                    'highlighted_name': highlighted_name,
                     'milk_types_html': milk_types_html,
                     'delivery_html': delivery_html,
                     'balance_html': balance_html
@@ -269,10 +392,13 @@ class CustomerListView(LoginRequiredMixin, ListView):
                 
                 html_content.append(row)
             
-            # Return JSON response
-            return JsonResponse({'customers': html_content})
+            # Return JSON response with all matching customers
+            return JsonResponse({
+                'customers': html_content,
+                'total_count': len(html_content)
+            })
             
-        # Regular request - proceed as normal
+        # Regular request - proceed as normal with pagination
         return super().get(request, *args, **kwargs)
 
 
@@ -297,6 +423,93 @@ class CustomerDetailView(LoginRequiredMixin, DetailView):
         
         # Calculate balance
         context['balance'] = customer.get_balance()
+        
+        # Get selected month and year for monthly consumption
+        today = timezone.now().date()
+        selected_month = self.request.GET.get('month', today.month)
+        selected_year = self.request.GET.get('year', today.year)
+        
+        try:
+            selected_month = int(selected_month)
+            selected_year = int(selected_year)
+            # Validate month and year
+            if not 1 <= selected_month <= 12:
+                selected_month = today.month
+            if not 2000 <= selected_year <= 2100:
+                selected_year = today.year
+        except (ValueError, TypeError):
+            selected_month = today.month
+            selected_year = today.year
+            
+        # Generate start and end dates for the selected month
+        start_date = datetime.date(selected_year, selected_month, 1)
+        if selected_month == 12:
+            end_date = datetime.date(selected_year + 1, 1, 1) - datetime.timedelta(days=1)
+        else:
+            end_date = datetime.date(selected_year, selected_month + 1, 1) - datetime.timedelta(days=1)
+            
+        # Get milk types this customer uses
+        milk_types = customer.milk_types.all()
+        
+        # Get daily sales data for the selected month
+        sales_data = Sale.objects.filter(
+            customer=customer,
+            date__gte=start_date,
+            date__lte=end_date
+        ).values('date', 'milk_type__name', 'quantity')
+        
+        # Organize sales by date
+        monthly_consumption = {}
+        for day in range(1, end_date.day + 1):
+            # Initialize each day with zeros for each milk type
+            current_date = datetime.date(selected_year, selected_month, day)
+            monthly_consumption[day] = {
+                'date': current_date,
+                'milk_data': {milk_type.name: Decimal('0.0') for milk_type in milk_types},
+                'total': Decimal('0.0')
+            }
+        
+        # Fill in actual sales data
+        for sale in sales_data:
+            day = sale['date'].day
+            milk_type = sale['milk_type__name']
+            quantity = sale['quantity']
+            
+            # Add the quantity to the appropriate day and milk type
+            if milk_type in monthly_consumption[day]['milk_data']:
+                monthly_consumption[day]['milk_data'][milk_type] += quantity
+            else:
+                monthly_consumption[day]['milk_data'][milk_type] = quantity
+                
+            # Update day's total
+            monthly_consumption[day]['total'] += quantity
+        
+        # Calculate monthly totals by milk type
+        milk_type_totals = {milk_type.name: Decimal('0.0') for milk_type in milk_types}
+        month_total = Decimal('0.0')
+        
+        for day_data in monthly_consumption.values():
+            for milk_type, quantity in day_data['milk_data'].items():
+                milk_type_totals[milk_type] += quantity
+                month_total += quantity
+        
+        # Add context variables
+        context['monthly_consumption'] = monthly_consumption
+        context['milk_type_totals'] = milk_type_totals
+        context['month_total'] = month_total
+        context['selected_month'] = selected_month
+        context['selected_year'] = selected_year
+        context['milk_types'] = milk_types
+        context['month_name'] = start_date.strftime('%B')
+        
+        # Generate month/year options for dropdown
+        context['month_options'] = [
+            {'number': m, 'name': datetime.date(2000, m, 1).strftime('%B')}
+            for m in range(1, 13)
+        ]
+        
+        current_year = today.year
+        context['year_options'] = range(current_year - 2, current_year + 1)
         
         return context
 

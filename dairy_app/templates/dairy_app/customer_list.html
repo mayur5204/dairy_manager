@@ -42,7 +42,7 @@
 </div>
 
 <style>
-        .milk-delivery-badge {
+    .milk-delivery-badge {
         background-color: #81c784 !important; /* Green background for badges */
         color: #1b5e20 !important; /* Dark green text for better contrast */
     }
@@ -51,13 +51,40 @@
         background-color: #f5f5f5 !important;
         color: #757575 !important;
     }
+    
+    /* Pagination styles */
+    .page-link {
+        color: #198754;
+    }
+    
+    .page-item.active .page-link {
+        background-color: #198754;
+        border-color: #198754;
+    }
+    
+    .page-link:focus {
+        box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25);
+    }
+    
+    /* Search highlighting styles */
+    .search-highlight {
+        background-color: #fff59d;
+        padding: 0 2px;
+        border-radius: 2px;
+        font-weight: bold;
+    }
 </style>
 
 <div class="card">
     <div class="card-header">
         <div class="d-flex justify-content-between align-items-center">
             <h5 class="mb-0">Customer List</h5>
-            <span class="badge bg-primary">{{ current_month }}</span>
+            <div class="d-flex align-items-center">
+                <span class="badge bg-primary me-2">{{ current_month }}</span>
+                {% if total_customers %}
+                <span class="badge bg-secondary">Total: {{ total_customers }} customers</span>
+                {% endif %}
+            </div>
         </div>
     </div>
     <div class="card-body">
@@ -79,7 +106,11 @@
                         <td>{{ forloop.counter }}</td>
                         <td>
                             <a href="{% url 'customer_detail' customer.id %}" class="text-decoration-none fw-bold">
-                                {{ customer.name }}
+                                {% if search_query and customer.highlighted_name %}
+                                    {{ customer.highlighted_name|safe }}
+                                {% else %}
+                                    {{ customer.name }}
+                                {% endif %}
                             </a>
                         </td>
                         <td>
@@ -127,6 +158,55 @@
                 </tbody>
             </table>
         </div>
+        
+        <!-- Pagination controls -->
+        {% if is_paginated %}
+        <div class="d-flex justify-content-center mt-4">
+            <nav aria-label="Customer pagination">
+                <ul class="pagination">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}" aria-label="First">
+                            <span aria-hidden="true">&laquo;&laquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for page_num in page_range %}
+                        {% if page_num == "..." %}
+                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% else %}
+                            <li class="page-item {% if page_obj.number == page_num %}active{% endif %}">
+                                <a class="page-link" href="?page={{ page_num }}{% if search_query %}&search={{ search_query }}{% endif %}">{{ page_num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}" aria-label="Last">
+                            <span aria-hidden="true">&raquo;&raquo;</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        <div class="text-center text-muted small">
+            Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ paginator.count }} customers
+        </div>
+        {% endif %}
+        
         <div id="noResultsMessage" class="text-center py-5 d-none">
             <i class="fas fa-users fa-3x text-muted mb-3"></i>
             <p class="lead">No customers found</p>
@@ -176,17 +256,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const performSearch = debounce(function(refreshSearch = false) {
         const searchTerm = searchInput.value.trim();
         
+        // If search term is empty, do a full page reload to restore pagination
+        if (!searchTerm) {
+            window.location.href = window.location.pathname;
+            return;
+        }
+        
         // Show spinner while searching
         searchSpinner.classList.remove('d-none');
         
         // Set the current URL with the search parameter to enable browser history
         // But don't include the ajax_search parameter in the URL
         const currentUrl = new URL(window.location.href);
-        if (searchTerm) {
-            currentUrl.searchParams.set('search', searchTerm);
-        } else {
-            currentUrl.searchParams.delete('search');
-        }
+        currentUrl.searchParams.set('search', searchTerm);
+        
+        // Remove page parameter when searching to start from page 1
+        currentUrl.searchParams.delete('page');
+        
         // Update the URL for browser history, but don't include ajax_search in the URL
         history.replaceState(null, '', currentUrl.toString());
         
@@ -212,6 +298,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // Hide spinner
             searchSpinner.classList.add('d-none');
             
+            // Hide pagination when showing search results
+            const paginationElements = document.querySelectorAll('.pagination, .text-center.text-muted.small');
+            paginationElements.forEach(el => {
+                el.style.display = 'none';
+            });
+            
             if (data.customers && data.customers.length > 0) {
                 // We have results
                 noResultsMessage.classList.add('d-none');
@@ -227,7 +319,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td>${customer.counter}</td>
                         <td>
                             <a href="/dairy/customers/${customer.id}/" class="text-decoration-none fw-bold">
-                                ${customer.name}
+                                ${customer.highlighted_name || customer.name}
                             </a>
                         </td>
                         <td>${customer.milk_types_html}</td>
@@ -249,6 +341,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     `;
                     customerTableBody.appendChild(row);
                 });
+                
+                // Show the total count of search results
+                const totalCountEl = document.createElement('div');
+                totalCountEl.className = 'text-center text-muted small mt-3';
+                totalCountEl.innerHTML = `Showing all ${data.total_count} matching customers`;
+                const cardBody = customerTableBody.closest('.card-body');
+                const existingTotalCount = cardBody.querySelector('.text-center.text-muted.small:not(.pagination + .text-center)');
+                if (existingTotalCount) {
+                    existingTotalCount.remove();
+                }
+                cardBody.appendChild(totalCountEl);
+                
             } else {
                 // No results
                 customerTableBody.classList.add('d-none');
@@ -280,15 +384,20 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Submit the search when input changes
     searchInput.addEventListener('input', function() {
-        performSearch(true);
+        if (this.value.trim()) {
+            performSearch(true);
+        } else {
+            // If search input is cleared, reload the page to restore pagination
+            window.location.href = window.location.pathname;
+        }
     });
     
     // Clear button functionality
     const clearSearchFunction = function(e) {
         if (e) e.preventDefault();
         searchInput.value = '';
-        performSearch(true);
-        searchInput.focus();
+        // Do a full page reload to restore pagination instead of AJAX search
+        window.location.href = window.location.pathname;
     };
     
     if (clearSearch) {
