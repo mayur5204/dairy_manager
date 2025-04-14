@@ -14,6 +14,11 @@ import os
 from pathlib import Path
 import dj_database_url
 
+# Load environment variables from .env file if it exists
+# This will NOT affect the PythonAnywhere environment since .env file doesn't exist there
+from dotenv import load_dotenv
+load_dotenv()
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
