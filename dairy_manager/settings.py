@@ -59,6 +59,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Add whitenoise for static files
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',  # Add LocaleMiddleware for language selection
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -140,11 +141,28 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+# Language code for the default language
+LANGUAGE_CODE = 'en'
+
+# Supported languages
+from django.utils.translation import gettext_lazy as _
+LANGUAGES = [
+    ('en', _('English')),
+    ('hi', _('Hindi')),
+    ('mr', _('Marathi')),
+    # Add more languages as needed
+    # ('gu', _('Gujarati')),
+]
+
+# Path where Django should look for translation files
+LOCALE_PATHS = [
+    os.path.join(BASE_DIR, 'locale'),
+]
 
 TIME_ZONE = 'UTC'
 
 USE_I18N = True
+USE_L10N = True  # Format dates, numbers and currencies according to the current locale
 
 USE_TZ = True
 

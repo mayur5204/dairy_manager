@@ -2,17 +2,19 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.db.models import Sum, F
+from django.utils.translation import gettext_lazy as _
 
 class MilkType(models.Model):
     """Model representing different types of milk (e.g., Cow, Buffalo)."""
     name = models.CharField(max_length=100)
-    rate_per_liter = models.DecimalField(max_digits=10, decimal_places=2, help_text='Rate in Rs per liter')
+    rate_per_liter = models.DecimalField(max_digits=10, decimal_places=2, help_text=_('Rate in Rs per liter'))
     
     class Meta:
         ordering = ['name']
     
     def __str__(self):
-        return f"{self.name} (₹{self.rate_per_liter}/liter)"
+        from django.utils.translation import gettext_lazy as _
+        return f"{self.name} ({_('₹{rate}/liter').format(rate=self.rate_per_liter)})"
 
 
 class Customer(models.Model):

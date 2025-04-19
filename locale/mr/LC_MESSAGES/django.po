@@ -1,0 +1,808 @@
+# Marathi translations for Dairy Manager application
+# Copyright (C) 2025 Dairy Manager Team
+# This file is distributed under the same license as the Dairy Manager package.
+# Mayur Raj <mayur@example.com>, 2025.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-04-19 19:00+0530\n"
+"PO-Revision-Date: 2025-04-19 19:10+0530\n"
+"Last-Translator: Mayur Raj <mayur@example.com>\n"
+"Language-Team: Marathi <mr@li.org>\n"
+"Language: mr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:4
+msgid "Dashboard - Trimurti Dairy"
+msgstr "डॅशबोर्ड - त्रिमूर्ती डेअरी"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:8
+msgid "Dashboard"
+msgstr "डॅशबोर्ड"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:12
+msgid "Record Sale"
+msgstr "विक्री नोंदवा"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:15
+msgid "Record Payment"
+msgstr "पेमेंट नोंदवा"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:29
+msgid "Today's Sales"
+msgstr "आजची विक्री"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:31
+#: .\dairy_app\templates\dairy_app\dashboard.html:129
+#: .\dairy_app\templates\dairy_app\dashboard.html:248
+msgid "liters"
+msgstr "लिटर"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:49
+msgid "This Month's Sales"
+msgstr "या महिन्याची विक्री"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:51
+#: .\dairy_app\templates\dairy_app\dashboard.html:71
+msgid "Total for"
+msgstr "एकूण"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:69
+msgid "This Month's Payments"
+msgstr "या महिन्याची पेमेंट्स"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:89
+msgid "Customers"
+msgstr "ग्राहक"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:92
+msgid "View all"
+msgstr "सर्व पहा"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:111
+msgid "Today's Milk Distribution"
+msgstr "आजचे दूध वितरण"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:120
+msgid "Milk Type"
+msgstr "दुधाचा प्रकार"
+
+msgid "Milk Types*"
+msgstr "दुधाचा प्रकार*"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:121
+msgid "Quantity"
+msgstr "प्रमाण"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:122
+#: .\dairy_app\templates\dairy_app\dashboard.html:166
+msgid "Amount"
+msgstr "रक्कम"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:142
+msgid "No milk distribution data for today"
+msgstr "आजच्या दिवसासाठी दूध वितरण डेटा नाही"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:143
+msgid "Record Today's Sales"
+msgstr "आजची विक्री नोंदवा"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:154
+msgid "Recent Activities"
+msgstr "अलीकडील क्रिया"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:162
+msgid "Sale"
+msgstr "विक्री"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:162
+msgid "liters of"
+msgstr "लिटर"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:165
+msgid "To customer"
+msgstr "ग्राहकाला"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:174
+msgid "Payment"
+msgstr "पेमेंट"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:177
+msgid "From customer"
+msgstr "ग्राहकाकडून"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:178
+msgid "Description"
+msgstr "वर्णन"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:178
+msgid "No description"
+msgstr "कोणतेही वर्णन नाही"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:185
+msgid "No recent activities"
+msgstr "कोणतीही अलीकडील क्रिया नाही"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:192
+msgid "All Sales"
+msgstr "सर्व विक्री"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:193
+msgid "All Payments"
+msgstr "सर्व पेमेंट्स"
+
+#: .\dairy_app\templates\dairy_app\dashboard.html:239
+msgid "Milk Quantity Distribution (Liters)"
+msgstr "दूध प्रमाण वितरण (लिटर)"
+
+#: .\dairy_manager\settings.py:150
+msgid "English"
+msgstr "इंग्रजी"
+
+#: .\dairy_manager\settings.py:151
+msgid "Hindi"
+msgstr "हिंदी"
+
+#: .\dairy_manager\settings.py:152
+msgid "Marathi"
+msgstr "मराठी"
+
+# Customer List Template
+msgid "Customers - Dairy Manager"
+msgstr "ग्राहक - डेअरी मॅनेजर"
+
+msgid "Add Customer"
+msgstr "ग्राहक जोडा"
+
+msgid "Search Customer"
+msgstr "ग्राहक शोधा"
+
+msgid "Search by customer name..."
+msgstr "ग्राहकाच्या नावाने शोधा..."
+
+msgid "Clear"
+msgstr "साफ करा"
+
+msgid "Searching..."
+msgstr "शोधत आहे..."
+
+msgid "Customer List"
+msgstr "ग्राहक यादी"
+
+msgid "Total"
+msgstr "एकूण"
+
+msgid "customers"
+msgstr "ग्राहक"
+
+msgid "Sr.No."
+msgstr "अ.क्र."
+
+msgid "Name"
+msgstr "नाव"
+
+msgid "Name*"
+msgstr "नाव*"
+
+msgid "Milk Types"
+msgstr "दुधाचे प्रकार"
+
+msgid "Total Milk Delivered"
+msgstr "एकूण दूध वितरीत"
+
+msgid "Balance"
+msgstr "शिल्लक"
+
+msgid "Balance (₹)"
+msgstr "शिल्लक (₹)"
+
+msgid "Actions"
+msgstr "क्रिया"
+
+msgid "None"
+msgstr "काहीही नाही"
+
+msgid "L"
+msgstr "लि"
+
+msgid "No deliveries"
+msgstr "कोणतेही वितरण नाही"
+
+msgid "Edit"
+msgstr "संपादित करा"
+
+msgid "Delete"
+msgstr "हटवा"
+
+# Combined "Showing" translations to avoid duplication
+msgid "Showing"
+msgstr "दाखवत आहे"
+
+msgid "of"
+msgstr "पैकी"
+
+msgid "No customers found"
+msgstr "कोणतेही ग्राहक आढळले नाहीत"
+
+msgid "No customers match your search"
+msgstr "तुमच्या शोधाशी जुळणारे कोणतेही ग्राहक नाहीत"
+
+msgid "Clear Search"
+msgstr "शोध साफ करा"
+
+msgid "Add customers to start recording sales and payments"
+msgstr "विक्री आणि पेमेंट नोंदवणे सुरू करण्यासाठी ग्राहक जोडा"
+
+msgid "Showing all"
+msgstr "सर्व दाखवत आहे"
+
+msgid "matching customers"
+msgstr "जुळणारे ग्राहक"
+
+# Sales List Template
+msgid "Sales - Dairy Manager"
+msgstr "विक्री - डेअरी मॅनेजर"
+
+msgid "Sales"
+msgstr "विक्री"
+
+msgid "Add Sale"
+msgstr "विक्री जोडा"
+
+msgid "Date"
+msgstr "तारीख"
+
+msgid "Date*"
+msgstr "तारीख*"
+
+msgid "Customer"
+msgstr "ग्राहक"
+
+msgid "Quantity in liters"
+msgstr "प्रमाण लिटरमध्ये"
+
+msgid "Rate"
+msgstr "दर"
+
+msgid "current"
+msgstr "सध्याचा"
+
+msgid "No sales records found"
+msgstr "कोणतेही विक्री रेकॉर्ड सापडले नाहीत"
+
+msgid "Record your milk sales to start tracking your business"
+msgstr "तुमच्या व्यवसायाचा मागोवा घेण्यासाठी तुमच्या दूध विक्रीची नोंद करा"
+
+# Payments List Template
+msgid "Payments - Dairy Manager"
+msgstr "पेमेंट्स - डेअरी मॅनेजर"
+
+msgid "Payments"
+msgstr "पेमेंट्स"
+
+msgid "Add Payment"
+msgstr "पेमेंट जोडा"
+
+msgid "No payment records found"
+msgstr "कोणतेही पेमेंट रेकॉर्ड सापडले नाहीत"
+
+msgid "Record customer payments to keep track of your business"
+msgstr "तुमच्या व्यवसायाचा मागोवा घेण्यासाठी ग्राहक पेमेंट्स नोंदवा"
+
+# Milk Types List Template
+msgid "Milk Types - Dairy Manager"
+msgstr "दूध प्रकार - डेअरी मॅनेजर"
+
+msgid "Add Milk Type"
+msgstr "दुधाचा प्रकार जोडा"
+
+msgid "liter"
+msgstr "लिटर"
+
+msgid "No milk types found"
+msgstr "कोणतेही दूध प्रकार सापडले नाहीत"
+
+msgid "Add milk types to start managing sales and customers"
+msgstr "विक्री आणि ग्राहकांचे व्यवस्थापन सुरू करण्यासाठी दूध प्रकार जोडा"
+
+# Reports Templates
+msgid "Daily Report"
+msgstr "दैनिक अहवाल"
+
+msgid "Daily Report - Dairy Manager"
+msgstr "दैनिक अहवाल - डेअरी मॅनेजर"
+
+msgid "Daily Sales Report"
+msgstr "दैनिक विक्री अहवाल"
+
+msgid "Filter Report"
+msgstr "अहवाल फिल्टर करा"
+
+msgid "Sales Report"
+msgstr "विक्री अहवाल"
+
+msgid "Start Date*"
+msgstr "सुरुवात तारीख*"
+
+msgid "End Date*"
+msgstr "समाप्ती तारीख*"
+
+msgid "to"
+msgstr "ते"
+
+msgid "Total Quantity (L)"
+msgstr "एकूण प्रमाण (लि)"
+
+msgid "Total Amount (₹)"
+msgstr "एकूण रक्कम (₹)"
+
+msgid "Summary"
+msgstr "सारांश"
+
+msgid "day(s)"
+msgstr "दिवस"
+
+msgid "Daily Sales Chart"
+msgstr "दैनिक विक्री चार्ट"
+
+msgid "No sales data available for the selected period"
+msgstr "निवडलेल्या कालावधीसाठी कोणताही विक्री डेटा उपलब्ध नाही"
+
+msgid "Please select a different date range or record sales for this period"
+msgstr "कृपया वेगळी तारीख श्रेणी निवडा किंवा या कालावधीसाठी विक्रीची नोंद करा"
+
+msgid "Quantity (L)"
+msgstr "प्रमाण (लि)"
+
+msgid "Amount (₹)"
+msgstr "रक्कम (₹)"
+
+msgid "Daily Sales Overview"
+msgstr "दैनिक विक्री आढावा"
+
+# Monthly Report Template
+msgid "Monthly Report"
+msgstr "मासिक अहवाल"
+
+msgid "Monthly Report - Dairy Manager"
+msgstr "मासिक अहवाल - डेअरी मॅनेजर"
+
+msgid "Monthly Sales Report"
+msgstr "मासिक विक्री अहवाल"
+
+msgid "Month"
+msgstr "महिना"
+
+msgid "Month*"
+msgstr "महिना*"
+
+msgid "Year"
+msgstr "वर्ष"
+
+msgid "Year*"
+msgstr "वर्ष*"
+
+msgid "Total Quantity"
+msgstr "एकूण प्रमाण"
+
+msgid "Sales Amount"
+msgstr "विक्री रक्कम"
+
+msgid "Monthly Performance Chart"
+msgstr "मासिक कामगिरी चार्ट"
+
+msgid "Monthly Sales, Payments and Balance"
+msgstr "मासिक विक्री, पेमेंट आणि शिल्लक"
+
+# Common Elements in Templates
+msgid "Trimurti Dairy"
+msgstr "त्रिमूर्ती डेअरी"
+
+msgid "Dairy Manager"
+msgstr "डेअरी मॅनेजर"
+
+msgid "Login"
+msgstr "लॉगिन करा"
+
+msgid "Login to Trimurti Dairy"
+msgstr "त्रिमूर्ती डेअरीमध्ये लॉगिन करा"
+
+msgid "Username"
+msgstr "वापरकर्ता नाव"
+
+msgid "Password"
+msgstr "पासवर्ड"
+
+msgid "Contact your system administrator for access."
+msgstr "प्रवेशासाठी आपल्या सिस्टम प्रशासकाशी संपर्क साधा."
+
+msgid "Register"
+msgstr "नोंदणी करा"
+
+msgid "Create New Account"
+msgstr "नवीन खाते तयार करा"
+
+msgid "Register for Trimurti Dairy"
+msgstr "त्रिमूर्ती डेअरीसाठी नोंदणी करा"
+
+msgid "First Name"
+msgstr "पहिले नाव"
+
+msgid "Last Name"
+msgstr "आडनाव"
+
+msgid "Email"
+msgstr "ईमेल"
+
+msgid "Confirm Password"
+msgstr "पासवर्डची पुष्टी करा"
+
+msgid "Create Account"
+msgstr "खाते तयार करा"
+
+msgid "Already have an account?"
+msgstr "आधीपासूनच खाते आहे?"
+
+msgid "Admin"
+msgstr "प्रशासक"
+
+msgid "Logout"
+msgstr "लॉगआउट करा"
+
+msgid "Reports"
+msgstr "अहवाल"
+
+msgid "Export data"
+msgstr "डेटा निर्यात करा"
+
+msgid "हिंदी"
+msgstr "हिंदी"
+
+# Customer Forms
+msgid "Add New Customer"
+msgstr "नवीन ग्राहक जोडा"
+
+msgid "Edit Customer"
+msgstr "ग्राहक संपादित करा"
+
+msgid "Phone"
+msgstr "फोन"
+
+msgid "Address"
+msgstr "पत्ता"
+
+msgid "Save"
+msgstr "जतन करा"
+
+msgid "Cancel"
+msgstr "रद्द करा"
+
+# Sale Forms
+msgid "Add New Sale"
+msgstr "नवीन विक्री जोडा"
+
+msgid "Edit Sale"
+msgstr "विक्री संपादित करा"
+
+msgid "Select milk types and enter quantities for this sale"
+msgstr "या विक्रीसाठी दुधाचे प्रकार निवडा आणि प्रमाण प्रविष्ट करा"
+
+msgid "Delete Sale"
+msgstr "विक्री हटवा"
+
+msgid "Are you sure you want to delete this sale?"
+msgstr "तुम्हाला खरोखरच ही विक्री हटवायची आहे का?"
+
+msgid "Sale for"
+msgstr "विक्रीसाठी"
+
+msgid "Back"
+msgstr "मागे"
+
+msgid "Yes, Delete"
+msgstr "होय, हटवा"
+
+msgid "Batch Input - Add Sales"
+msgstr "बॅच इनपुट - विक्री जोडा"
+
+msgid "Batch Sale Entry"
+msgstr "बॅच विक्री नोंद"
+
+msgid "Select Date"
+msgstr "तारीख निवडा"
+
+msgid "Submit All"
+msgstr "सर्व सबमिट करा"
+
+# Payment Forms
+msgid "Add New Payment"
+msgstr "नवीन पेमेंट जोडा"
+
+msgid "Edit Payment"
+msgstr "पेमेंट संपादित करा"
+
+msgid "Delete Payment"
+msgstr "पेमेंट हटवा"
+
+msgid "Are you sure you want to delete this payment?"
+msgstr "तुम्हाला खरोखरच हे पेमेंट हटवायचे आहे का?"
+
+msgid "Payment for"
+msgstr "पेमेंटसाठी"
+
+# Milk Type Forms
+msgid "Add New Milk Type"
+msgstr "नवीन दूध प्रकार जोडा"
+
+msgid "Edit Milk Type"
+msgstr "दूध प्रकार संपादित करा"
+
+msgid "Delete Milk Type"
+msgstr "दूध प्रकार हटवा"
+
+msgid "Are you sure you want to delete this milk type?"
+msgstr "तुम्हाला खरोखरच हा दूध प्रकार हटवायचा आहे का?"
+
+msgid "per liter"
+msgstr "प्रति लिटर"
+
+# Additional Rate Translations
+msgid "Rate per liter (₹)"
+msgstr "प्रति लिटर दर (₹)"
+
+msgid "Rate in Rs per liter"
+msgstr "प्रति लिटर रुपये दर"
+
+msgid "Rate in Rupees per liter"
+msgstr "प्रति लिटर रुपये दर"
+
+# Customer Export Template
+msgid "Customer Data Export"
+msgstr "ग्राहक डेटा निर्यात"
+
+msgid "Back to Dashboard"
+msgstr "डॅशबोर्डवर परत जा"
+
+msgid "Select Month and Year"
+msgstr "महिना आणि वर्ष निवडा"
+
+msgid "Update Preview"
+msgstr "पूर्वावलोकन अपडेट करा"
+
+msgid "Update"
+msgstr "अपडेट करा"
+
+msgid "Customer Data for"
+msgstr "ग्राहक डेटा"
+
+msgid "Export as Excel"
+msgstr "एक्सेल म्हणून निर्यात करा"
+
+msgid "This is a preview showing limited data. Download the Excel file for the complete dataset."
+msgstr "हे मर्यादित डेटा दर्शविणारे पूर्वावलोकन आहे. संपूर्ण डेटासेटसाठी एक्सेल फाइल डाउनलोड करा."
+
+msgid "Daily Milk Delivery (liters)"
+msgstr "दैनिक दूध वितरण (लिटर)"
+
+msgid "Total (L)"
+msgstr "एकूण (लि)"
+
+msgid "Overall Total (₹)"
+msgstr "एकूण योग (₹)"
+
+msgid "out of"
+msgstr "पैकी"
+
+msgid "customers. Download the export for complete data."
+msgstr "ग्राहक. संपूर्ण डेटासाठी निर्यात डाउनलोड करा."
+
+msgid "No customer data available for the selected month"
+msgstr "निवडलेल्या महिन्यासाठी कोणताही ग्राहक डेटा उपलब्ध नाही"
+
+msgid "Try selecting a different month or add milk sales data"
+msgstr "वेगळा महिना निवडा किंवा दूध विक्री डेटा जोडा"
+
+# Month Names 
+msgid "January"
+msgstr "जानेवारी"   
+
+msgid "February"
+msgstr "फेब्रुवारी"
+
+msgid "March"
+msgstr "मार्च"
+
+msgid "April"
+msgstr "एप्रिल"
+
+msgid "May"
+msgstr "मे"
+
+msgid "June"
+msgstr "जून"
+
+msgid "July"
+msgstr "जुलै"
+
+msgid "August"
+msgstr "ऑगस्ट"
+
+msgid "September"
+msgstr "सप्टेंबर"
+
+msgid "October"
+msgstr "ऑक्टोबर"
+
+msgid "November"
+msgstr "नोव्हेंबर"
+
+msgid "December"
+msgstr "डिसेंबर"
+
+# Confirm Delete Page
+msgid "Confirm Delete"
+msgstr "हटविण्याची पुष्टी करा"
+
+msgid "This action cannot be undone. This will permanently delete this sale record."
+msgstr "ही क्रिया पूर्ववत केली जाऊ शकत नाही. हे विक्री रेकॉर्ड कायमचे हटवेल."
+
+msgid "This action cannot be undone. This will permanently delete this payment record."
+msgstr "ही क्रिया पूर्ववत केली जाऊ शकत नाही. हे पेमेंट रेकॉर्ड कायमचे हटवेल."
+
+msgid "This action cannot be undone. All related records will remain, but will reference a deleted milk type."
+msgstr "ही क्रिया पूर्ववत केली जाऊ शकत नाही. सर्व संबंधित रेकॉर्ड राहतील, परंतु हटवलेल्या दूध प्रकाराचा संदर्भ देतील."
+
+msgid "Delete Permanently"
+msgstr "कायमचे हटवा"
+
+msgid "Are you sure you want to remove this sale?"
+msgstr "तुम्हाला खरोखरच ही विक्री हटवायची आहे का?"
+
+msgid "Back to List"
+msgstr "यादीवर परत जा"
+
+msgid "Total Amount"
+msgstr "एकूण रक्कम"
+
+# Month Selection Filter Translations
+msgid "Select Month"
+msgstr "महिना निवडा"
+
+msgid "Select Year"
+msgstr "वर्ष निवडा"
+
+msgid "No data available for the selected month"
+msgstr "निवडलेल्या महिन्यासाठी कोणताही डेटा उपलब्ध नाही"
+
+msgid "Please select a different month or record sales for this month"
+msgstr "कृपया वेगळा महिना निवडा किंवा या महिन्यासाठी विक्रीची नोंद करा"
+
+# Export Data Translations
+msgid "Export Data"
+msgstr "डेटा निर्यात करा"
+
+msgid "Export Preview"
+msgstr "निर्यात पूर्वावलोकन"
+
+msgid "Select Month for Export"
+msgstr "निर्यातीसाठी महिना निवडा"
+
+msgid "Processing..."
+msgstr "प्रक्रिया चालू आहे..."
+
+msgid "Download Complete Report"
+msgstr "पूर्ण अहवाल डाउनलोड करा"
+
+msgid "Daily Totals"
+msgstr "दैनिक एकूण"
+
+msgid "Customer Details"
+msgstr "ग्राहक तपशील"
+
+# Additional translations for forms
+msgid "Milk Types and Quantities"
+msgstr "दुधाचे प्रकार आणि प्रमाण"
+
+msgid "Notes"
+msgstr "नोट्स"
+
+msgid "Amount*"
+msgstr "रक्कम*"
+
+msgid "Customer Data"
+msgstr "ग्राहक डेटा"
+
+msgid "Add"
+msgstr "जोडा"
+
+# Customer Detail Page
+msgid "Customer Detail"
+msgstr "ग्राहक तपशील"
+
+msgid "Customer Information"
+msgstr "ग्राहक माहिती"
+
+msgid "Not provided"
+msgstr "प्रदान केलेले नाही"
+
+msgid "Joined On"
+msgstr "सामील झाले"
+
+msgid "None Selected"
+msgstr "कोणताही निवडलेला नाही"
+
+msgid "Amount to be received from customer"
+msgstr "ग्राहकाकडून मिळवायची रक्कम"
+
+msgid "Advance payment from customer"
+msgstr "ग्राहकाकडून अग्रिम पेमेंट"
+
+msgid "No pending balance"
+msgstr "कोणतीही शिल्लक रक्कम नाही"
+
+msgid "Monthly Milk Consumption"
+msgstr "मासिक दूध वापर"
+
+msgid "Go"
+msgstr "जा"
+
+msgid "Day"
+msgstr "दिवस"
+
+msgid "No milk consumption data available for this month"
+msgstr "या महिन्यासाठी कोणताही दूध वापर डेटा उपलब्ध नाही"
+
+msgid "Recent Sales"
+msgstr "अलीकडील विक्री"
+
+msgid "New Sale"
+msgstr "नवीन विक्री"
+
+msgid "No sales records found for this customer"
+msgstr "या ग्राहकासाठी कोणतेही विक्री रेकॉर्ड सापडले नाहीत"
+
+msgid "Record First Sale"
+msgstr "प्रथम विक्री नोंदवा"
+
+msgid "Recent Payments"
+msgstr "अलीकडील पेमेंट्स"
+
+msgid "New Payment"
+msgstr "नवीन पेमेंट"
+
+msgid "No payment records found for this customer"
+msgstr "या ग्राहकासाठी कोणतेही पेमेंट रेकॉर्ड सापडले नाहीत"
+
+msgid "Record First Payment"
+msgstr "प्रथम पेमेंट नोंदवा"
+
+# Customer Delete Confirmation
+msgid "Delete Customer"
+msgstr "ग्राहक हटवा"
+
+msgid "Warning!"
+msgstr "सावधान!"
+
+msgid "Are you sure you want to delete this customer?"
+msgstr "तुम्हाला खरोखरच हा ग्राहक हटवायचा आहे का?"
+
+msgid "This customer has:"
+msgstr "या ग्राहकाकडे आहे:"
+
+msgid "sales record"
+msgstr "विक्री नोंद"
+
+msgid "payment record"
+msgstr "पेमेंट नोंद"
+
+msgid "Deleting this customer will make those records reference a deleted customer."
+msgstr "हा ग्राहक हटवल्याने त्या नोंदी हटविलेल्या ग्राहकाचा संदर्भ देतील."
+
+msgid "Back to Details"
+msgstr "तपशिलांकडे परत जा"
+

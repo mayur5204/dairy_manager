@@ -1,6 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.db.models import Sum, F, DecimalField
 from django.db.models.functions import TruncDay, TruncMonth
@@ -9,12 +8,13 @@ from django.contrib import messages
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import HttpResponseRedirect, JsonResponse
+from django.http import HttpResponseRedirect, JsonResponse, HttpResponse
+from django.utils.translation import gettext_lazy as _
 
 from .models import MilkType, Customer, Sale, Payment
 from .forms import (
-    CustomUserCreationForm, MilkTypeForm, CustomerForm, SaleForm, 
-    SaleInputForm, PaymentForm, DateRangeForm
+    MilkTypeForm, CustomerForm, SaleForm, 
+    SaleInputForm, PaymentForm, DateRangeForm, MonthSelectionForm
 )
 
 import re
@@ -22,22 +22,7 @@ import datetime
 from datetime import timedelta
 from decimal import Decimal
 
-# Authentication Views
-def register_view(request):
-    """View for user registration"""
-    if request.method == "POST":
-        form = CustomUserCreationForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            login(request, user)
-            messages.success(request, f"Account created for {user.username}!")
-            return redirect('dashboard')
-    else:
-        form = CustomUserCreationForm()
-    
-    return render(request, "dairy_app/register.html", {"form": form})
-
-
+# Dashboard View
 @login_required
 def dashboard_view(request):
     """Main dashboard view showing summary data"""
@@ -71,10 +56,10 @@ def dashboard_view(request):
     month_total_payment = month_payments.aggregate(total=Sum('amount'))['total'] or 0
     
     # Get recent sales
-    recent_sales = Sale.objects.order_by('-date')[:5]
+    recent_sales = Sale.objects.order_by('-created_at')[:5]  # Order by creation time
     
     # Get recent payments
-    recent_payments = Payment.objects.order_by('-date')[:5]
+    recent_payments = Payment.objects.order_by('-created_at')[:5] # Order by creation time
     
     # Get milk type distribution for today
     milk_type_distribution = []
@@ -107,6 +92,54 @@ def dashboard_view(request):
     
     return render(request, 'dairy_app/dashboard.html', context)
 
+
+# Search API for Customers
+@login_required
+def search_customers(request):
+    """AJAX view to search customers by name"""
+    search_query = request.GET.get('search', '').strip()
+    results = []
+    
+    if search_query:
+        # Search for customers by name
+        customers = Customer.objects.filter(name__icontains=search_query)[:10]  # Limit to 10 results
+        
+        # Format results with highlighting
+        for idx, customer in enumerate(customers):
+            # Highlight the matching part of the name
+            name = customer.name
+            query_lower = search_query.lower()
+            name_lower = name.lower()
+            
+            highlighted_name = ""
+            last_end = 0
+            
+            # Find all occurrences of the search term and wrap them with highlight spans
+            start = name_lower.find(query_lower)
+            while start != -1:
+                # Add the text before the match
+                highlighted_name += name[last_end:start]
+                
+                # Add the highlighted match
+                match_end = start + len(search_query)
+                highlighted_name += f'<span class="search-highlight">{name[start:match_end]}</span>'
+                
+                # Move past this match
+                last_end = match_end
+                start = name_lower.find(query_lower, last_end)
+            
+            # Add any remaining text
+            if last_end < len(name):
+                highlighted_name += name[last_end:]
+            
+            results.append({
+                'id': customer.id,
+                'name': customer.name,
+                'highlighted_name': highlighted_name,
+                'counter': idx + 1
+            })
+    
+    return JsonResponse({'customers': results})
 
 # Milk Type Views
 class MilkTypeListView(LoginRequiredMixin, ListView):
@@ -273,12 +306,14 @@ class CustomerListView(LoginRequiredMixin, ListView):
         # Create a list of page numbers to display
         page_range = list(paginator.get_elided_page_range(page_obj.number, on_each_side=2, on_ends=1))
         
-        context['customer_data'] = customer_data
-        context['milk_types'] = all_milk_types
-        context['search_query'] = search_query
-        context['current_month'] = today.strftime('%B %Y')
-        context['page_range'] = page_range
-        context['total_customers'] = paginator.count
+        context.update({
+            'customer_data': customer_data,
+            'milk_types': all_milk_types,
+            'search_query': search_query,
+            'current_month': today.strftime('%B %Y'),
+            'page_range': page_range,
+            'total_customers': paginator.count
+        })
         
         return context
         
@@ -416,10 +451,10 @@ class CustomerDetailView(LoginRequiredMixin, DetailView):
         customer = self.object
         
         # Get recent sales
-        context['recent_sales'] = Sale.objects.filter(customer=customer).order_by('-date')[:10]
+        context['recent_sales'] = Sale.objects.filter(customer=customer).order_by('-created_at')[:10] # Order by creation time
         
         # Get recent payments
-        context['recent_payments'] = Payment.objects.filter(customer=customer).order_by('-date')[:10]
+        context['recent_payments'] = Payment.objects.filter(customer=customer).order_by('-created_at')[:10] # Order by creation time
         
         # Calculate balance
         context['balance'] = customer.get_balance()
@@ -490,8 +525,25 @@ class CustomerDetailView(LoginRequiredMixin, DetailView):
         
         for day_data in monthly_consumption.values():
             for milk_type, quantity in day_data['milk_data'].items():
+                if milk_type not in milk_type_totals:
+                    milk_type_totals[milk_type] = Decimal('0.0')
                 milk_type_totals[milk_type] += quantity
                 month_total += quantity
+        
+        # Ensure all milk types are initialized in milk_type_totals
+        for milk_type in milk_types:
+            if milk_type.name not in milk_type_totals:
+                milk_type_totals[milk_type.name] = Decimal('0.0')
+        
+        # Ensure all milk types are initialized in milk_type_totals
+        all_milk_types = MilkType.objects.all()
+        for milk_type in all_milk_types:
+            if milk_type.name not in milk_type_totals:
+                milk_type_totals[milk_type.name] = Decimal('0.0')
+        
+        # Import translation functions
+        from django.utils.translation import gettext_lazy as _
+        from django.utils.dates import MONTHS
         
         # Add context variables
         context['monthly_consumption'] = monthly_consumption
@@ -500,11 +552,13 @@ class CustomerDetailView(LoginRequiredMixin, DetailView):
         context['selected_month'] = selected_month
         context['selected_year'] = selected_year
         context['milk_types'] = milk_types
-        context['month_name'] = start_date.strftime('%B')
         
-        # Generate month/year options for dropdown
+        # Use translated month name instead of strftime
+        context['month_name'] = _(MONTHS[selected_month])
+        
+        # Generate month options with translated names
         context['month_options'] = [
-            {'number': m, 'name': datetime.date(2000, m, 1).strftime('%B')}
+            {'number': m, 'name': _(MONTHS[m])}
             for m in range(1, 13)
         ]
         
@@ -554,9 +608,31 @@ class CustomerDeleteView(LoginRequiredMixin, DeleteView):
         # Return all customers
         return Customer.objects.all()
     
+    def get_context_data(self, **kwargs):
+        # Add additional context with translations
+        context = super().get_context_data(**kwargs)
+        from django.utils.translation import gettext as _
+        
+        # Add explicitly translated common texts
+        context.update({
+            'page_title': _('Delete Customer'),
+            'confirm_delete_title': _('Confirm Delete'),
+            'confirm_prompt': _('Are you sure you want to delete this customer?'),
+            'warning_text': _('Warning!'),
+            'customer_has': _('This customer has:'),
+            'sales_record': _('sales record'),
+            'payment_record': _('payment record'),
+            'delete_warning': _('Deleting this customer will make those records reference a deleted customer.'),
+            'cancel_button': _('Cancel'),
+            'delete_button': _('Delete Permanently'),
+            'back_to_details': _('Back to Details'),
+        })
+        
+        return context
+    
     def delete(self, request, *args, **kwargs):
         customer = self.get_object()
-        messages.success(request, f"Customer '{customer.name}' deleted successfully!")
+        messages.success(request, _("Customer '%(name)s' deleted successfully!") % {'name': customer.name})
         return super().delete(request, *args, **kwargs)
 
 
@@ -568,8 +644,8 @@ class SaleListView(LoginRequiredMixin, ListView):
     paginate_by = 20
     
     def get_queryset(self):
-        # Return all sales
-        return Sale.objects.all().order_by('-date')
+        # Return all sales ordered by creation time (newest first)
+        return Sale.objects.all().order_by('-created_at')
 
 
 @login_required
@@ -579,13 +655,18 @@ def get_milk_types_for_customer(request):
     if customer_id:
         try:
             customer = Customer.objects.get(id=customer_id)
-            milk_types = list(customer.milk_types.values('id', 'name'))
+            milk_types = list(customer.milk_types.all())
             
-            # If the customer doesn't have any milk types assigned, return all available milk types
-            if not milk_types:
-                milk_types = list(MilkType.objects.all().values('id', 'name'))
-                
-            return JsonResponse({'milk_types': milk_types})
+            milk_types_data = [
+                {
+                    'id': milk_type.id, 
+                    'name': milk_type.name,
+                    'rate_per_liter': float(milk_type.rate_per_liter)
+                } 
+                for milk_type in milk_types
+            ]
+            
+            return JsonResponse({'milk_types': milk_types_data})
         except Customer.DoesNotExist:
             return JsonResponse({'error': 'Customer not found'}, status=404)
     return JsonResponse({'error': 'No customer ID provided'}, status=400)
@@ -599,101 +680,114 @@ def get_all_milk_types(request):
 
 @login_required
 def sale_create_view(request):
+    customer = None
+    customer_milk_types = []
+    search_results = None
+    from_customer_page = False
+    
+    # Check if user is coming from customer detail page
+    referer = request.META.get('HTTP_REFERER', '')
+    from_customer_page = '/customers/' in referer
+    
+    # If no customer selected and not from customer page, redirect to customer list with search
+    if not request.GET.get('customer') and not from_customer_page:
+        return redirect('customer_list')
+    
+    # Handle search query
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        search_results = Customer.objects.filter(name__icontains(search_query))
+    
+    # Handle customer selection
+    customer_id = request.GET.get('customer')
+    if customer_id:
+        try:
+            customer = Customer.objects.get(id=customer_id)
+            customer_milk_types = customer.milk_types.all()
+            form = SaleForm(initial={'customer': customer})
+        except Customer.DoesNotExist:
+            form = SaleForm()
+    else:
+        form = SaleForm()
+    
     if request.method == 'POST':
-        form = SaleForm(request.POST)
-        if form.is_valid():
-            sale = form.save(commit=False)
+        # Check if we're handling batch input
+        if 'milk_types[]' in request.POST:
+            milk_type_ids = request.POST.getlist('milk_types[]')
+            quantities = request.POST.getlist('quantities[]')
+            customer_id = request.POST.get('customer')
+            date = request.POST.get('date')
+            notes = request.POST.get('notes', '')
+            
             # Use the first admin user as default owner for all records
             first_user = User.objects.filter(is_superuser=True).first() or request.user
-            sale.user = first_user
-            # If rate not provided, use the milk type's rate
-            if not sale.rate:
-                sale.rate = sale.milk_type.rate_per_liter
-            sale.save()
-            messages.success(request, "Sale recorded successfully!")
-            return redirect('sale_list')
-    else:
-        # Check if customer parameter is passed in URL
-        customer_id = request.GET.get('customer')
-        if customer_id:
+            
+            # Validate and create sales for each selected milk type
+            sales_created = 0
             try:
                 customer = Customer.objects.get(id=customer_id)
-                form = SaleForm(initial={'customer': customer})
-            except Customer.DoesNotExist:
-                form = SaleForm()
-        else:
-            form = SaleForm()
-    
-    return render(request, 'dairy_app/sale_form.html', {'form': form})
-
-
-@login_required
-def batch_sale_input(request):
-    """View for batch input of sales."""
-    if request.method == 'POST':
-        form = SaleInputForm(request.POST)
-        if form.is_valid():
-            customer = form.cleaned_data['customer']
-            date = form.cleaned_data['date']
-            sales_input = form.cleaned_data['sales_input']
-            
-            # Get all milk types
-            all_milk_types = MilkType.objects.all()
-            type_map = {}
-            for milk_type in all_milk_types:
-                first_letter = milk_type.name[0].upper()
-                type_map[first_letter] = milk_type
                 
-            # Split input by '-'
-            parts = sales_input.split('-')
-            if len(parts) >= 3:
-                quantities = parts[:-1]  # All but the last part are quantities
-                type_codes = list(parts[-1].upper())  # Last part contains type codes
-                
-                if len(quantities) == len(type_codes):
-                    # Create sales records
-                    created_sales = 0
-                    # Use the first admin user as default owner for all records
-                    first_user = User.objects.filter(is_superuser=True).first() or request.user
+                # Create a sale for each selected milk type with a quantity
+                for i, milk_type_id in enumerate(milk_type_ids):
+                    # Skip if no quantity or invalid quantity
+                    if i >= len(quantities) or not quantities[i]:
+                        continue
                     
-                    for i in range(len(quantities)):
+                    try:
+                        quantity = Decimal(quantities[i])
+                        if quantity <= 0:
+                            continue
+                            
                         try:
-                            quantity = Decimal(quantities[i])
-                            type_code = type_codes[i]
+                            milk_type = MilkType.objects.get(id=milk_type_id)
                             
-                            if type_code in type_map:
-                                milk_type = type_map[type_code]
-                                # Create the sale record
-                                Sale.objects.create(
-                                    user=first_user,
-                                    customer=customer,
-                                    milk_type=milk_type,
-                                    date=date,
-                                    quantity=quantity,
-                                    rate=milk_type.rate_per_liter
-                                )
-                                created_sales += 1
-                            else:
-                                messages.error(request, f"Milk type code '{type_code}' is not available.")
-                        except (ValueError, IndexError):
-                            messages.error(request, f"Invalid input format: {sales_input}")
-                            return render(request, 'dairy_app/sale_batch_input.html', {'form': form})
-                            
-                    if created_sales > 0:
-                        messages.success(request, f"{created_sales} sales recorded successfully!")
-                        return redirect('sale_list')
-                    else:
-                        messages.error(request, "No valid sales were created. Please check the milk type codes.")
+                            # Create the sale
+                            Sale.objects.create(
+                                user=first_user,
+                                customer=customer,
+                                milk_type=milk_type,
+                                date=date,
+                                quantity=quantity,
+                                rate=milk_type.rate_per_liter,
+                                notes=notes
+                            )
+                            sales_created += 1
+                        except MilkType.DoesNotExist:
+                            messages.error(request, f"Invalid milk type selected")
+                    except (ValueError, TypeError):
+                        messages.error(request, f"Invalid quantity provided")
+                
+                if sales_created > 0:
+                    messages.success(request, f"{sales_created} sales recorded successfully!")
+                    return redirect('sale_list')
                 else:
-                    messages.error(request, "The number of quantities should match the number of milk type codes.")
-            else:
-                messages.error(request, "Invalid input format. Use format like '1-2-B'.")
-    else:
-        form = SaleInputForm()
-        
-    # Pass all milk types to the template
-    milk_types = MilkType.objects.all()
-    return render(request, 'dairy_app/sale_batch_input.html', {'form': form, 'milk_types': milk_types})
+                    messages.error(request, "No valid sales were created. Please check your input.")
+            except Customer.DoesNotExist:
+                messages.error(request, "Invalid customer selected")
+        else:
+            # Handle regular single sale form
+            form = SaleForm(request.POST)
+            if form.is_valid():
+                sale = form.save(commit=False)
+                # Use the first admin user as default owner for all records
+                first_user = User.objects.filter(is_superuser=True).first() or request.user
+                sale.user = first_user
+                # If rate not provided, use the milk type's rate
+                if not sale.rate:
+                    sale.rate = sale.milk_type.rate_per_liter
+                sale.save()
+                messages.success(request, "Sale recorded successfully!")
+                return redirect('sale_list')
+    
+    context = {
+        'form': form,
+        'customer': customer,
+        'from_customer_page': from_customer_page,
+        'customer_milk_types': customer_milk_types,
+        'search_results': search_results,
+    }
+    
+    return render(request, 'dairy_app/sale_form.html', context)
 
 
 class SaleUpdateView(LoginRequiredMixin, UpdateView):
@@ -706,9 +800,18 @@ class SaleUpdateView(LoginRequiredMixin, UpdateView):
         # Return all sales
         return Sale.objects.all()
     
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        return kwargs
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Add customer to context so the template doesn't redirect to search
+        context['customer'] = self.object.customer
+        # Add customer milk types to context
+        context['customer_milk_types'] = self.object.customer.milk_types.all()
+        
+        # Add the current milk type and quantity for pre-selection in form
+        context['current_milk_type_id'] = self.object.milk_type.id
+        context['current_quantity'] = self.object.quantity
+        context['current_rate'] = self.object.rate
+        return context
     
     def form_valid(self, form):
         messages.success(self.request, "Sale updated successfully!")
@@ -737,12 +840,40 @@ class PaymentListView(LoginRequiredMixin, ListView):
     paginate_by = 20
     
     def get_queryset(self):
-        # Return all payments
-        return Payment.objects.all().order_by('-date')
+        # Return all payments ordered by creation time (newest first)
+        return Payment.objects.all().order_by('-created_at')
 
 
 @login_required
 def payment_create_view(request):
+    customer = None
+    search_results = None
+    from_customer_page = False
+    
+    # Check if user is coming from customer detail page
+    referer = request.META.get('HTTP_REFERER', '')
+    from_customer_page = '/customers/' in referer
+    
+    # If no customer selected and not from customer page, redirect to customer list with search
+    if not request.GET.get('customer') and not from_customer_page:
+        return redirect('customer_list')
+    
+    # Handle search query
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        search_results = Customer.objects.filter(name__icontains(search_query))
+    
+    # Handle customer selection
+    customer_id = request.GET.get('customer')
+    if customer_id:
+        try:
+            customer = Customer.objects.get(id=customer_id)
+            form = PaymentForm(initial={'customer': customer})
+        except Customer.DoesNotExist:
+            form = PaymentForm()
+    else:
+        form = PaymentForm()
+
     if request.method == 'POST':
         form = PaymentForm(request.POST)
         if form.is_valid():
@@ -752,20 +883,20 @@ def payment_create_view(request):
             payment.user = first_user
             payment.save()
             messages.success(request, "Payment recorded successfully!")
+            
+            # If coming from customer detail page, redirect back there
+            if from_customer_page and customer:
+                return redirect('customer_detail', pk=customer.id)
             return redirect('payment_list')
-    else:
-        # Check if customer parameter is passed in URL
-        customer_id = request.GET.get('customer')
-        if customer_id:
-            try:
-                customer = Customer.objects.get(id=customer_id)
-                form = PaymentForm(initial={'customer': customer})
-            except Customer.DoesNotExist:
-                form = PaymentForm()
-        else:
-            form = PaymentForm()
     
-    return render(request, 'dairy_app/payment_form.html', {'form': form})
+    context = {
+        'form': form,
+        'customer': customer,
+        'from_customer_page': from_customer_page,
+        'search_results': search_results,
+    }
+    
+    return render(request, 'dairy_app/payment_form.html', context)
 
 
 class PaymentUpdateView(LoginRequiredMixin, UpdateView):
@@ -778,9 +909,11 @@ class PaymentUpdateView(LoginRequiredMixin, UpdateView):
         # Return all payments
         return Payment.objects.all()
     
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        return kwargs
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Add customer to context so the template doesn't redirect to search
+        context['customer'] = self.object.customer
+        return context
     
     def form_valid(self, form):
         messages.success(self.request, "Payment updated successfully!")
@@ -874,24 +1007,31 @@ def monthly_report_view(request):
     today = timezone.now().date()
     
     if request.method == 'POST':
-        form = DateRangeForm(request.POST)
+        form = MonthSelectionForm(request.POST)
         if form.is_valid():
-            start_date = form.cleaned_data['start_date']
-            end_date = form.cleaned_data['end_date']
+            selected_month = int(form.cleaned_data['month'])
+            selected_year = int(form.cleaned_data['year'])
         else:
-            # Default to current year
-            start_date = today.replace(month=1, day=1)
-            end_date = today
+            # Default to current month and year
+            selected_month = today.month
+            selected_year = today.year
     else:
-        # Default to current year
-        form = DateRangeForm(initial={
-            'start_date': today.replace(month=1, day=1),
-            'end_date': today
+        # Default to current month and year
+        form = MonthSelectionForm(initial={
+            'month': today.month,
+            'year': today.year
         })
-        start_date = today.replace(month=1, day=1)
-        end_date = today
+        selected_month = today.month
+        selected_year = today.year
     
-    # Get monthly sales data - removed user filter
+    # Generate start and end dates for the selected month
+    start_date = datetime.date(selected_year, selected_month, 1)
+    if selected_month == 12:
+        end_date = datetime.date(selected_year + 1, 1, 1) - datetime.timedelta(days=1)
+    else:
+        end_date = datetime.date(selected_year, selected_month + 1, 1) - datetime.timedelta(days=1)
+    
+    # Get monthly sales data
     monthly_sales = Sale.objects.filter(
         date__gte=start_date,
         date__lte=end_date
@@ -902,7 +1042,7 @@ def monthly_report_view(request):
         total_amount=Sum(F('quantity') * F('rate'), output_field=DecimalField())
     ).order_by('month')
     
-    # Get monthly payment data - removed user filter
+    # Get monthly payment data
     monthly_payments = Payment.objects.filter(
         date__gte=start_date,
         date__lte=end_date
@@ -912,7 +1052,7 @@ def monthly_report_view(request):
         total_amount=Sum('amount')
     ).order_by('month')
     
-    # Organize the data by month
+    # Organize the data
     report_data = {}
     for sale in monthly_sales:
         month_str = sale['month'].strftime('%Y-%m')
@@ -945,8 +1085,8 @@ def monthly_report_view(request):
     for month_str, data in report_data.items():
         data['balance'] = data['total_amount'] - data['total_payment']
     
-    # Convert to a list sorted by month
-    report_list = [report_data[month_str] for month_str in sorted(report_data.keys(), reverse=True)]
+    # Convert to a list
+    report_list = [report_data[month_str] for month_str in sorted(report_data.keys())]
     
     # Calculate totals for the entire period
     total_quantity = sum(month_data['total_quantity'] for month_data in report_list)
@@ -957,8 +1097,8 @@ def monthly_report_view(request):
     context = {
         'form': form,
         'report_data': report_list,
-        'start_date': start_date,
-        'end_date': end_date,
+        'month_name': start_date.strftime('%B'),
+        'year': selected_year,
         'total_quantity': total_quantity,
         'total_sales': total_sales,
         'total_payments': total_payments,
@@ -969,67 +1109,482 @@ def monthly_report_view(request):
 
 
 @login_required
-def customer_balance_report_view(request):
-    """View for displaying customer balance report"""
-    # Get all customers instead of filtering by user
-    customers = Customer.objects.all()
-    customer_data = []
+def customer_export_view(request):
+    """View for displaying customer data export page with month/year selection"""
+    # Get current date
+    today = timezone.now().date()
+    
+    # Handle month/year selection
+    if request.method == 'POST':
+        selected_month = int(request.POST.get('month', today.month))
+        selected_year = int(request.POST.get('year', today.year))
+    else:
+        selected_month = int(request.GET.get('month', today.month))
+        selected_year = int(request.GET.get('year', today.year))
+    
+    # Validate month and year
+    if not 1 <= selected_month <= 12:
+        selected_month = today.month
+    if not 2000 <= selected_year <= 2100:
+        selected_year = today.year
+    
+    # Generate start and end dates for the selected month
+    start_date = datetime.date(selected_year, selected_month, 1)
+    if selected_month == 12:
+        end_date = datetime.date(selected_year + 1, 1, 1) - datetime.timedelta(days=1)
+    else:
+        end_date = datetime.date(selected_year, selected_month + 1, 1) - datetime.timedelta(days=1)
+    
+    days_in_month = end_date.day
+    day_range = range(1, days_in_month + 1)
+    preview_days = min(7, days_in_month)  # Show only 7 days in preview
+    
+    # For better performance, limit to top 25 customers for web view
+    customers = Customer.objects.all().order_by('name')[:25]
+    
+    # Pre-fetch all sales data for these customers in one query
+    customer_ids = [customer.id for customer in customers]
+    all_sales = Sale.objects.filter(
+        customer_id__in=customer_ids,
+        date__gte=start_date,
+        date__lte=end_date
+    ).select_related('milk_type').order_by('customer_id', 'milk_type_id', 'date')
+    
+    # Pre-fetch balance data for all customers at once
+    all_customer_totals = {}
+    
+    # Get total sales for all customers in one query
+    all_sales_totals = Sale.objects.filter(
+        customer_id__in=customer_ids
+    ).values('customer_id').annotate(
+        total=Sum(F('quantity') * F('rate'), output_field=DecimalField())
+    )
+    for entry in all_sales_totals:
+        all_customer_totals[entry['customer_id']] = {
+            'sales': entry['total'] or Decimal('0')
+        }
+    
+    # Get total payments for all customers in one query
+    all_payment_totals = Payment.objects.filter(
+        customer_id__in=customer_ids
+    ).values('customer_id').annotate(
+        total=Sum('amount')
+    )
+    for entry in all_payment_totals:
+        customer_id = entry['customer_id']
+        if customer_id not in all_customer_totals:
+            all_customer_totals[customer_id] = {'sales': Decimal('0')}
+        all_customer_totals[customer_id]['payments'] = entry['total'] or Decimal('0')
+    
+    # Calculate balances
+    for customer_id, totals in all_customer_totals.items():
+        sales_total = totals.get('sales', Decimal('0'))
+        payment_total = totals.get('payments', Decimal('0'))
+        all_customer_totals[customer_id]['balance'] = sales_total - payment_total
+    
+    # Pre-fetch all milk types for all customers in one query
+    customer_milk_type_map = {}
+    for customer in customers:
+        customer_milk_type_map[customer.id] = list(customer.milk_types.all())
+    
+    # Get month's total amounts for each customer in one query
+    month_total_amounts = {}
+    monthly_sales_totals = Sale.objects.filter(
+        customer_id__in=customer_ids,
+        date__gte=start_date,
+        date__lte=end_date
+    ).values('customer_id').annotate(
+        total_amount=Sum(F('quantity') * F('rate'), output_field=DecimalField())
+    )
+    for entry in monthly_sales_totals:
+        month_total_amounts[entry['customer_id']] = entry['total_amount'] or Decimal('0')
+    
+    # Group sales data by customer and milk_type for easier lookup
+    sales_by_customer_milk_type = {}
+    for sale in all_sales:
+        customer_id = sale.customer_id
+        milk_type_id = sale.milk_type_id
+        sale_date = sale.date
+        
+        if customer_id not in sales_by_customer_milk_type:
+            sales_by_customer_milk_type[customer_id] = {}
+        
+        if milk_type_id not in sales_by_customer_milk_type[customer_id]:
+            sales_by_customer_milk_type[customer_id][milk_type_id] = {}
+        
+        day = sale_date.day
+        if day not in sales_by_customer_milk_type[customer_id][milk_type_id]:
+            sales_by_customer_milk_type[customer_id][milk_type_id][day] = Decimal('0')
+        
+        sales_by_customer_milk_type[customer_id][milk_type_id][day] += sale.quantity
+    
+    # Process each customer
+    customers_data = []
     
     for customer in customers:
-        total_sales = Sale.objects.filter(customer=customer).aggregate(
-            total=Sum(F('quantity') * F('rate'), output_field=DecimalField())
-        )['total'] or 0
+        customer_id = customer.id
+        balance = all_customer_totals.get(customer_id, {}).get('balance', Decimal('0'))
+        total_amount = month_total_amounts.get(customer_id, Decimal('0'))
         
-        total_payments = Payment.objects.filter(customer=customer).aggregate(
-            total=Sum('amount')
-        )['total'] or 0
+        # Get milk types used by this customer
+        customer_milk_types = customer_milk_type_map.get(customer_id, [])
         
-        balance = total_sales - total_payments
+        # If customer has no milk types but has sales, use milk types from sales
+        if not customer_milk_types and customer_id in sales_by_customer_milk_type:
+            # Get unique milk types from sales
+            milk_type_ids = sales_by_customer_milk_type[customer_id].keys()
+            customer_milk_types = [Sale.objects.filter(id__in=list(all_sales)[:1], milk_type_id=mt_id).first().milk_type 
+                                for mt_id in milk_type_ids]
         
-        customer_data.append({
+        # Create milk type data for this customer
+        milk_types_data = []
+        
+        for milk_type in customer_milk_types:
+            if not milk_type:
+                continue
+            
+            milk_type_id = milk_type.id
+            daily_data = {}
+            milk_type_quantity = Decimal('0')
+            milk_type_amount = Decimal('0')
+            
+            # Get customer's sales data for this milk type
+            if customer_id in sales_by_customer_milk_type and milk_type_id in sales_by_customer_milk_type[customer_id]:
+                milk_type_sales = sales_by_customer_milk_type[customer_id][milk_type_id]
+                
+                # Process daily data
+                for day in range(1, days_in_month + 1):
+                    quantity = milk_type_sales.get(day, Decimal('0'))
+                    daily_data[day] = quantity
+                    milk_type_quantity += quantity
+                
+                # Calculate amount for this milk type
+                milk_type_amount = milk_type_quantity * milk_type.rate_per_liter
+            else:
+                # Initialize empty daily data
+                for day in range(1, days_in_month + 1):
+                    daily_data[day] = Decimal('0')
+            
+            # Skip milk types with no sales if customer doesn't have a balance
+            if milk_type_quantity == 0 and balance == 0:
+                continue
+                
+            # Add milk type data
+            milk_types_data.append({
+                'milk_type': milk_type,
+                'daily_data': daily_data,
+                'total_quantity': milk_type_quantity,
+                'total_amount': milk_type_amount
+            })
+        
+        # Skip customer if they have no milk types with data
+        if not milk_types_data and balance == 0:
+            continue
+            
+        # Add customer data with milk types
+        customers_data.append({
             'customer': customer,
-            'total_sales': total_sales,
-            'total_payments': total_payments,
-            'balance': balance
+            'balance': balance,
+            'overall_total': total_amount,
+            'milk_types': milk_types_data,
+            'num_milk_types': len(milk_types_data)
         })
     
-    # Sort by balance (highest first)
-    customer_data.sort(key=lambda x: x['balance'], reverse=True)
+    # Generate month/year options for dropdown
+    month_options = [
+        {'number': m, 'name': datetime.date(2000, m, 1).strftime('%B')}
+        for m in range(1, 13)
+    ]
+    
+    current_year = today.year
+    year_options = range(current_year - 2, current_year + 1)
     
     context = {
-        'customer_data': customer_data
+        'customers_data': customers_data,
+        'selected_month': selected_month,
+        'selected_year': selected_year,
+        'month_name': start_date.strftime('%B'),
+        'month_options': month_options,
+        'year_options': year_options,
+        'day_range': day_range,
+        'days_in_month': days_in_month,
+        'preview_days': preview_days
     }
     
-    return render(request, 'dairy_app/customer_balance_report.html', context)
+    return render(request, 'dairy_app/customer_export.html', context)
 
 
 @login_required
-def get_milk_types_for_customer(request):
-    """AJAX view to get milk types for a specific customer"""
-    customer_id = request.GET.get('customer_id')
+def download_customer_data(request):
+    """View for downloading customer data as Excel"""
+    from django.utils.translation import gettext as _
+    from django.utils.translation import get_language
+    from django.utils.dates import MONTHS
     
-    if not customer_id:
-        return JsonResponse({'error': 'No customer ID provided'}, status=400)
+    # Get parameters
+    selected_month = int(request.GET.get('month', timezone.now().month))
+    selected_year = int(request.GET.get('year', timezone.now().year))
     
-    try:
-        customer = Customer.objects.get(id=customer_id)
-        milk_types = customer.milk_types.all()
+    # Validate month and year
+    today = timezone.now().date()
+    if not 1 <= selected_month <= 12:
+        selected_month = today.month
+    if not 2000 <= selected_year <= 2100:
+        selected_year = today.year
+    
+    # Generate start and end dates for the selected month
+    start_date = datetime.date(selected_year, selected_month, 1)
+    if selected_month == 12:
+        end_date = datetime.date(selected_year + 1, 1, 1) - datetime.timedelta(days=1)
+    else:
+        end_date = datetime.date(selected_year, selected_month + 1, 1) - datetime.timedelta(days=1)
+    
+    days_in_month = end_date.day
+    
+    # Get all customers
+    customers = Customer.objects.all().order_by('name')
+    
+    # Create filename with translated month name
+    month_name = _(start_date.strftime('%B'))
+    filename = f"customer_data_{month_name}_{selected_year}"
+    
+    # For Excel export
+    import xlwt
+    
+    # Create workbook and add sheet
+    wb = xlwt.Workbook(encoding='utf-8')
+    sheet_name = _('Customer Data')
+    ws = wb.add_sheet(sheet_name[:31])  # Excel sheet names limited to 31 chars
+    
+    # Define borders - all thin
+    borders = xlwt.Borders()
+    borders.left = xlwt.Borders.THIN
+    borders.right = xlwt.Borders.THIN
+    borders.top = xlwt.Borders.THIN
+    borders.bottom = xlwt.Borders.THIN
+    
+    # Styles
+    header_style = xlwt.easyxf('font: bold on; align: wrap on, vert centre, horiz center')
+    header_style.borders = borders
+    
+    date_style = xlwt.easyxf('font: bold on; align: wrap on, vert centre, horiz center')
+    date_style.borders = borders
+    
+    # Customer name style - center aligned
+    customer_style = xlwt.easyxf('align: wrap on, vert centre, horiz center')
+    customer_style.borders = borders
+    
+    # Regular cell style with borders
+    cell_style = xlwt.easyxf('align: wrap on')
+    cell_style.borders = borders
+    
+    # Number style with right alignment and borders
+    number_style = xlwt.easyxf('align: wrap on, horiz right')
+    number_style.num_format_str = '0.00'
+    number_style.borders = borders
+    
+    # Balance and overall total style - middle aligned
+    amount_style = xlwt.easyxf('font: bold on; align: wrap on, vert centre, horiz center')
+    amount_style.num_format_str = '0.00'
+    amount_style.borders = borders
+    
+    # Total style
+    total_style = xlwt.easyxf('font: bold on; align: wrap on, horiz right')
+    total_style.num_format_str = '0.00'
+    total_style.borders = borders
+    
+    # Translate column headers
+    customer_header = _('Customer')
+    milk_type_header = _('Milk Type')
+    total_liters_header = _('Total (L)')
+    total_amount_header = _('Total Amount (₹)')
+    balance_header = _('Balance (₹)')
+    overall_total_header = _('Overall Total (₹)')
+    
+    # Write headers
+    col_idx = 0
+    ws.write(0, col_idx, customer_header, header_style)
+    col_idx += 1
+    ws.write(0, col_idx, milk_type_header, header_style)
+    col_idx += 1
+    
+    # Days headers (just the day number)
+    daily_delivery_header = _('Daily Milk Delivery (liters)')
+    for day in range(1, days_in_month + 1):
+        ws.write(0, col_idx, str(day), date_style)
+        col_idx += 1
+    
+    # Total columns
+    ws.write(0, col_idx, total_liters_header, header_style)
+    col_idx += 1
+    ws.write(0, col_idx, total_amount_header, header_style)
+    col_idx += 1
+    ws.write(0, col_idx, balance_header, header_style)
+    col_idx += 1
+    ws.write(0, col_idx, overall_total_header, header_style)
+    
+    # Process each customer and write data
+    row_idx = 1
+    
+    for customer in customers:
+        # Calculate customer's overall balance
+        total_sales_all_time = Sale.objects.filter(customer=customer).aggregate(
+            total=Sum(F('quantity') * F('rate'), output_field=DecimalField())
+        )['total'] or Decimal('0')
         
-        milk_types_data = [
-            {
-                'id': milk_type.id, 
-                'name': milk_type.name,
-                'rate_per_liter': float(milk_type.rate_per_liter)
-            } 
-            for milk_type in milk_types
-        ]
+        total_payments = Payment.objects.filter(customer=customer).aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0')
         
-        return JsonResponse({'milk_types': milk_types_data})
+        balance = total_sales_all_time - total_payments
+        
+        # Get sales for this customer in the selected month
+        sales = Sale.objects.filter(
+            customer=customer,
+            date__gte=start_date,
+            date__lte=end_date
+        ).select_related('milk_type')
+        
+        if not sales.exists() and balance == 0:
+            continue  # Skip customers with no sales in selected month and zero balance
+        
+        # Calculate customer's total amount for this month
+        total_amount = sales.aggregate(
+            total=Sum(F('quantity') * F('rate'), output_field=DecimalField())
+        )['total'] or Decimal('0')
+        
+        # Get milk types used by this customer
+        customer_milk_types = list(customer.milk_types.all())
+        
+        # If customer has no milk types but has sales, use milk types from sales
+        if not customer_milk_types:
+            customer_milk_types = list(set(sale.milk_type for sale in sales))
+        
+        # If there are no sales and no milk types associated, just show one row with balance
+        if not customer_milk_types and not sales.exists() and balance != 0:
+            # Write customer name
+            col_idx = 0
+            ws.write(row_idx, col_idx, customer.name, customer_style)
+            col_idx += 1
+            ws.write(row_idx, col_idx, "-", cell_style)
+            col_idx += 1
+            
+            # Skip all days (empty)
+            for _ in range(days_in_month):
+                ws.write(row_idx, col_idx, '-', cell_style)
+                col_idx += 1
+            
+            # Write empty totals
+            ws.write(row_idx, col_idx, 0, number_style)
+            col_idx += 1
+            ws.write(row_idx, col_idx, 0, number_style)
+            col_idx += 1
+            
+            # Write balance
+            ws.write(row_idx, col_idx, float(balance), amount_style)
+            col_idx += 1
+            
+            # Write overall total
+            ws.write(row_idx, col_idx, float(total_amount), amount_style)
+            
+            row_idx += 1
+            continue
+        
+        first_row_for_customer = row_idx
+        customer_rows_count = len([mt for mt in customer_milk_types if 
+                                  sales.filter(milk_type=mt).exists() or balance != 0])
+        
+        # If no milk types have sales, ensure at least one row
+        if customer_rows_count == 0:
+            customer_rows_count = 1
+        
+        # If this customer has multiple milk types, merge cells for customer name, balance and overall total first
+        if customer_rows_count > 1:
+            # Merge customer name column
+            ws.write_merge(first_row_for_customer, first_row_for_customer + customer_rows_count - 1, 0, 0, customer.name, customer_style)
+            
+            # Calculate column indices for balance and overall total
+            balance_col = 2 + days_in_month + 2  # Customer, Milk Type, Days columns, Total L, Total Amount
+            overall_total_col = balance_col + 1
+            
+            # Merge balance and overall total columns
+            ws.write_merge(first_row_for_customer, first_row_for_customer + customer_rows_count - 1, 
+                           balance_col, balance_col, float(balance), amount_style)
+            ws.write_merge(first_row_for_customer, first_row_for_customer + customer_rows_count - 1, 
+                           overall_total_col, overall_total_col, float(total_amount), amount_style)
+        else:
+            # Only one milk type, no need to merge
+            ws.write(first_row_for_customer, 0, customer.name, customer_style)
+            
+            balance_col = 2 + days_in_month + 2
+            overall_total_col = balance_col + 1
+            
+            ws.write(first_row_for_customer, balance_col, float(balance), amount_style)
+            ws.write(first_row_for_customer, overall_total_col, float(total_amount), amount_style)
+        
+        # Process each milk type
+        current_row = first_row_for_customer
+        for milk_type in customer_milk_types:
+            # Get sales for this specific milk type
+            milk_type_sales = sales.filter(milk_type=milk_type)
+            
+            # Calculate totals for this milk type
+            milk_type_quantity = milk_type_sales.aggregate(total=Sum('quantity'))['total'] or Decimal('0')
+            milk_type_amount = milk_type_sales.aggregate(
+                total=Sum(F('quantity') * F('rate'), output_field=DecimalField())
+            )['total'] or Decimal('0')
+            
+            # Skip milk types with no sales if they don't have a balance
+            if milk_type_quantity == 0 and balance == 0:
+                continue
+            
+            # Write milk type name (column 1)
+            ws.write(current_row, 1, milk_type.name, cell_style)
+            
+            # Write daily quantities for this milk type
+            col_idx = 2  # Start from the first day column
+            for day in range(1, days_in_month + 1):
+                day_date = datetime.date(selected_year, selected_month, day)
+                day_sales = milk_type_sales.filter(date=day_date)
+                quantity = day_sales.aggregate(total=Sum('quantity'))['total'] or Decimal('0')
+                
+                if quantity > 0:
+                    ws.write(current_row, col_idx, float(quantity), number_style)
+                else:
+                    ws.write(current_row, col_idx, '-', cell_style)
+                col_idx += 1
+            
+            # Write milk type total quantity
+            ws.write(current_row, col_idx, float(milk_type_quantity), number_style)
+            col_idx += 1
+            
+            # Write milk type total amount
+            ws.write(current_row, col_idx, float(milk_type_amount), number_style)
+            
+            current_row += 1
+        
+        # Update the row_idx to the next available row
+        row_idx = current_row
     
-    except Customer.DoesNotExist:
-        return JsonResponse({'error': 'Customer not found'}, status=404)
-
-def get_all_milk_types(request):
-    """Return all available milk types."""
-    milk_types = list(MilkType.objects.all().values('id', 'name'))
-    return JsonResponse({'milk_types': milk_types})
+    # Set column width
+    col_count = 2 + days_in_month + 3  # Customer, Milk type, Days, Total L, Total Amount, Balance, Overall Total
+    for i in range(col_count):
+        if i == 0:  # Customer name column
+            ws.col(i).width = 256 * 30  # 30 characters wide
+        elif i == 1:  # Milk type column
+            ws.col(i).width = 256 * 10  # 10 characters wide
+        elif i <= 1 + days_in_month:  # Day columns
+            ws.col(i).width = 256 * 5   # 5 characters wide
+        else:
+            ws.col(i).width = 256 * 15  # 15 characters wide
+    
+    # Create response with correct MIME type for Excel files
+    response = HttpResponse(content_type='application/vnd.ms-excel')
+    
+    # Set the Content-Disposition header with proper filename and extension
+    sanitized_filename = filename.replace(" ", "_")  # Replace spaces with underscores
+    response['Content-Disposition'] = f'attachment; filename="{sanitized_filename}.xls"'
+    
+    # Save workbook to response
+    wb.save(response)
+    return response

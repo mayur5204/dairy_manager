@@ -1,21 +1,22 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
+{% load i18n %}
 
-{% block title %}Batch Sale Input - Dairy Manager{% endblock %}
+{% block title %}{% trans "Batch Sale Input" %} - {% trans "Dairy Manager" %}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">
         <i class="fas fa-th text-primary"></i>
-        Batch Sale Input
+        {% trans "Batch Sale Input" %}
     </h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group me-2">
             <a href="{% url 'sale_list' %}" class="btn btn-sm btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> Back to List
+                <i class="fas fa-arrow-left"></i> {% trans "Back to List" %}
             </a>
             <a href="{% url 'sale_add' %}" class="btn btn-sm btn-outline-primary">
-                <i class="fas fa-plus-circle"></i> Add Single Sale
+                <i class="fas fa-plus-circle"></i> {% trans "Add Single Sale" %}
             </a>
         </div>
     </div>
@@ -23,23 +24,22 @@
 
 <div class="card mb-4">
     <div class="card-header">
-        <h5 class="mb-0">Quick Input Format</h5>
+        <h5 class="mb-0">{% trans "Quick Input Format" %}</h5>
     </div>
     <div class="card-body">
         <div class="alert alert-info">
-            <h5><i class="fas fa-info-circle"></i> How to use batch input</h5>
-            <p class="mb-0">Enter quantities and milk types using the format:</p>
-            <p class="font-monospace">quantity-quantity-milk_type_code</p>
-            <p class="mb-0"><strong>Example:</strong> <code>1-2-CB</code> means 1 liter of Cow milk and 2 liters of Buffalo milk.</p>
-            <p class="mb-2"><strong>Available milk types:</strong></p>
+            <h5><i class="fas fa-info-circle"></i> {% trans "How to use batch input" %}</h5>
+            <p class="mb-0">{% trans "Enter quantities and milk types using the format:" %}</p>
+            <p class="font-monospace">{% trans "quantity-quantity-milk_type_code" %}</p>
+            <p class="mb-0"><strong>{% trans "Example:" %}</strong> <code>1-2-CB</code> {% trans "means 1 liter of Cow milk and 2 liters of Buffalo milk." %}</p>
+            <p class="mb-2"><strong>{% trans "Available milk types for selected customer:" %}</strong></p>
             <div id="available-milk-types">
-                {% for milk_type in milk_types %}
-                <span class="badge bg-primary me-2">{{ milk_type.name }} = {{ milk_type.name.0|upper }}</span>
-                {% endfor %}
+                <p class="text-muted">{% trans "Please select a customer to see their assigned milk types." %}</p>
             </div>
         </div>
         <form method="post">
             {% csrf_token %}
+            
             <div class="row">
                 <div class="col-md-6">
                     {{ form.customer|as_crispy_field }}
@@ -54,9 +54,9 @@
                 </div>
             </div>
             <div class="mt-4 text-end">
-                <a href="{% url 'sale_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                <a href="{% url 'sale_list' %}" class="btn btn-outline-secondary">{% trans "Cancel" %}</a>
                 <button type="submit" class="btn btn-primary">
-                    Save Sales
+                    {% trans "Save Sales" %}
                 </button>
             </div>
         </form>
@@ -68,7 +68,48 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const customerSelect = document.getElementById('id_customer');
-        // This page always shows all milk types regardless of customer selection
+        const availableMilkTypesDiv = document.getElementById('available-milk-types');
+        
+        // Function to update available milk types display
+        function updateAvailableMilkTypes() {
+            if (customerSelect.value) {
+                // Fetch milk types for selected customer
+                fetch(`{% url 'get_milk_types_for_customer' %}?customer_id=${customerSelect.value}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.milk_types && data.milk_types.length > 0) {
+                            // Display customer's milk types with codes
+                            const milkTypesHtml = data.milk_types.map(milkType => 
+                                `<span class="badge bg-primary me-2">${milkType.name} = ${milkType.name[0].toUpperCase()} (₹${milkType.rate_per_liter}/L)</span>`
+                            ).join('');
+                            availableMilkTypesDiv.innerHTML = milkTypesHtml;
+                        } else {
+                            availableMilkTypesDiv.innerHTML = '<p class="text-warning">{% trans "No milk types assigned to this customer." %}</p>';
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Failed to fetch milk types:", error);
+                        availableMilkTypesDiv.innerHTML = '<p class="text-danger">{% trans "Error loading milk types" %}</p>';
+                    });
+            } else {
+                availableMilkTypesDiv.innerHTML = '<p class="text-muted">{% trans "Please select a customer to see their assigned milk types." %}</p>';
+            }
+        }
+        
+        // Update milk types when customer selection changes
+        if (customerSelect) {
+            customerSelect.addEventListener('change', updateAvailableMilkTypes);
+            
+            // Initialize on page load if a customer is already selected
+            if (customerSelect.value) {
+                updateAvailableMilkTypes();
+            }
+        }
     });
 </script>
 {% endblock %}

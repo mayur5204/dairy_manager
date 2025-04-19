@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% load dict_filters %}
+{% load i18n %}
+
+{% block title %}{% trans "Customer Data Export" %} - {% trans "Dairy Manager" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-file-export text-primary"></i> {% trans "Customer Data Export" %}</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="{% url 'dashboard' %}" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> {% trans "Back to Dashboard" %}
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Month/Year Selection Form -->
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <h5 class="mb-0">{% trans "Select Month and Year" %}</h5>
+    </div>
+    <div class="card-body">
+        <form method="post" class="row g-3" id="export-form">
+            {% csrf_token %}
+            <div class="col-md-4">
+                <label for="id_month" class="form-label">{% trans "Month*" %}</label>
+                <select name="month" id="id_month" class="form-select">
+                    {% for month in month_options %}
+                        <option value="{{ month.number }}" {% if selected_month == month.number %}selected{% endif %}>
+                            {% trans month.name %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="id_year" class="form-label">{% trans "Year*" %}</label>
+                <select name="year" id="id_year" class="form-select">
+                    {% for year in year_options %}
+                        <option value="{{ year }}" {% if selected_year == year %}selected{% endif %}>
+                            {{ year }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4 align-self-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-sync"></i> {% trans "Update Preview" %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Customer Data Preview and Export Options -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">{% trans "Customer Data for" %} {{ month_name }} {{ selected_year }}</h5>
+        <div class="btn-group">
+            <a href="{% url 'download_customer_data' %}?month={{ selected_month }}&year={{ selected_year }}&format=excel" class="btn btn-primary btn-sm">
+                <i class="fas fa-file-excel"></i> {% trans "Export as Excel" %}
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if customers_data %}
+        <div class="table-responsive">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> {% trans "This is a preview showing limited data. Download the Excel file for the complete dataset." %}
+            </div>
+            <table class="table table-striped table-bordered table-hover">
+                <thead>
+                    <tr>
+                        <th style="min-width: 160px;" rowspan="2" class="align-middle">{% trans "Customer" %}</th>
+                        <th style="min-width: 80px;" rowspan="2" class="align-middle">{% trans "Milk Type" %}</th>
+                        <th colspan="{{ preview_days }}" class="text-center">{% trans "Daily Milk Delivery (liters)" %}</th>
+                        <th style="min-width: 80px;" rowspan="2" class="align-middle">{% trans "Total (L)" %}</th>
+                        <th style="min-width: 100px;" rowspan="2" class="align-middle">{% trans "Total Amount (₹)" %}</th>
+                        <th style="min-width: 100px;" rowspan="2" class="align-middle">{% trans "Balance (₹)" %}</th>
+                        <th style="min-width: 100px;" rowspan="2" class="align-middle">{% trans "Overall Total (₹)" %}</th>
+                    </tr>
+                    <tr>
+                        {% for day in day_range|slice:":7" %}
+                        <th style="min-width: 40px;" class="text-center">{{ day }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% with preview_customers=customers_data|slice:":5" %}
+                    {% for customer_data in preview_customers %}
+                        {% with customer=customer_data.customer milk_types=customer_data.milk_types %}
+                            {% for milk_idx, milk_type_data in milk_types|enumerate %}
+                                <tr>
+                                    {% if milk_idx == 0 %}
+                                        <td rowspan="{{ customer_data.milk_types|length }}" class="align-middle">
+                                            <strong>{{ customer.name }}</strong>
+                                        </td>
+                                    {% endif %}
+                                    
+                                    <td class="text-center">
+                                        <span class="badge bg-success">{{ milk_type_data.milk_type.name }}</span>
+                                    </td>
+                                    
+                                    {% for day in day_range|slice:":7" %}
+                                        <td class="text-center">
+                                            {% with quantity=milk_type_data.daily_data|get_item:day %}
+                                                {% if quantity > 0 %}{{ quantity|floatformat:1 }}{% else %}-{% endif %}
+                                            {% endwith %}
+                                        </td>
+                                    {% endfor %}
+                                    
+                                    <td class="text-end fw-bold">{{ milk_type_data.total_quantity|floatformat:1 }}</td>
+                                    <td class="text-end">₹{{ milk_type_data.total_amount|floatformat:2 }}</td>
+                                    
+                                    {% if milk_idx == 0 %}
+                                        <td rowspan="{{ customer_data.milk_types|length }}" class="text-end fw-bold align-middle">
+                                            ₹{{ customer_data.balance|floatformat:2 }}
+                                        </td>
+                                        <td rowspan="{{ customer_data.milk_types|length }}" class="text-end fw-bold align-middle">
+                                            ₹{{ customer_data.overall_total|floatformat:2 }}
+                                        </td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        {% endwith %}
+                    {% endfor %}
+                    {% endwith %}
+                </tbody>
+            </table>
+            {% if customers_data|length > 5 %}
+            <div class="text-center mt-2">
+                <p class="text-muted">{% trans "Showing" %} {{ customers_data|slice:":5"|length }} {% trans "out of" %} {{ customers_data|length }} {% trans "customers. Download the export for complete data." %}</p>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-file-export fa-3x text-muted mb-3"></i>
+            <p class="lead">{% trans "No customer data available for the selected month" %}</p>
+            <p class="text-muted">{% trans "Try selecting a different month or add milk sales data" %}</p>
+            <div class="mt-4">
+                <a href="{% url 'customer_add' %}" class="btn btn-primary me-2">
+                    <i class="fas fa-plus-circle"></i> {% trans "Add Customer" %}
+                </a>
+                <a href="{% url 'sale_add' %}" class="btn btn-info">
+                    <i class="fas fa-milk"></i> {% trans "Add Sale" %}
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* No custom scripts needed here */
+</script>
+{% endblock %}

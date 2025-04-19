@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{% if LANGUAGE_CODE %}{{ LANGUAGE_CODE }}{% else %}en{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Trimurti Dairy{% endblock %}</title>
+    {% load i18n %}
+    <title>{% block title %}{% trans "Trimurti Dairy" %}{% endblock %}</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -27,6 +28,8 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            /* Add padding bottom for mobile to account for the bottom nav bar */
+            padding-bottom: 60px;
         }
         
         .navbar {
@@ -78,12 +81,12 @@
         
         .btn-primary {
             background-color: var(--primary-color);
-            border-color: var(--primary-color);
+            border-color: var (--primary-color);
         }
         
         .btn-primary:hover {
-            background-color: var(--dark-color);
-            border-color: var(--dark-color);
+            background-color: var (--dark-color);
+            border-color: var (--dark-color);
         }
 
         .btn-accent {
@@ -151,6 +154,58 @@
             font-size: 2rem;
             color: var(--primary-color);
         }
+
+        /* Mobile Bottom Navigation Bar */
+        .mobile-bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background-color: var(--primary-color);
+            height: 60px;
+            display: flex;
+            justify-content: space-around;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .mobile-bottom-nav .nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255, 255, 255, 0.8);
+            padding: 8px 0;
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+        }
+
+        .mobile-bottom-nav .nav-item i {
+            font-size: 1.4rem;
+            margin-bottom: 4px;
+        }
+
+        .mobile-bottom-nav .nav-item.active {
+            color: #ffffff;
+            font-weight: bold;
+        }
+
+        .mobile-bottom-nav .nav-item:hover {
+            color: #ffffff;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Hide on larger screens */
+        @media (min-width: 992px) {
+            .mobile-bottom-nav {
+                display: none;
+            }
+            body {
+                padding-bottom: 0;
+            }
+        }
     </style>
     
     {% block extra_css %}{% endblock %}
@@ -160,7 +215,7 @@
     <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
         <div class="container-fluid">
             <a class="navbar-brand" href="{% url 'dashboard' %}">
-                <i class="fas fa-milk-bottle"></i> Trimurti Dairy
+                <i class="fas fa-milk-bottle"></i> {% trans "Trimurti Dairy" %}
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
@@ -171,69 +226,104 @@
                     <!-- Main navigation links visible in mobile and desktop -->
                     <li class="nav-item d-lg-none">
                         <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
-                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                            <i class="fas fa-tachometer-alt"></i> {% trans "Dashboard" %}
                         </a>
                     </li>
                     <li class="nav-item d-lg-none">
                         <a class="nav-link {% if 'customer' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'customer_list' %}">
-                            <i class="fas fa-users"></i> Customers
+                            <i class="fas fa-users"></i> {% trans "Customers" %}
                         </a>
                     </li>
                     <li class="nav-item d-lg-none">
                         <a class="nav-link {% if 'sale' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'sale_list' %}">
-                            <i class="fas fa-bottle-water"></i> Sales
+                            <i class="fas fa-cash-register fa-fw"></i> {% trans "Sales" %}
                         </a>
                     </li>
                     <li class="nav-item d-lg-none">
                         <a class="nav-link {% if 'payment' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'payment_list' %}">
-                            <i class="fas fa-money-bill"></i> Payments
+                            <i class="fas fa-money-bill-wave fa-fw"></i> {% trans "Payments" %}
                         </a>
                     </li>
                     <li class="nav-item d-lg-none">
                         <a class="nav-link {% if 'milk_type' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'milk_type_list' %}">
-                            <i class="fas fa-list"></i> Milk Types
+                            <i class="fas fa-list"></i> {% trans "Milk Types" %}
                         </a>
                     </li>
                     <li class="nav-item d-lg-none">
                         <a class="nav-link {% if request.resolver_match.url_name == 'daily_report' %}active{% endif %}" href="{% url 'daily_report' %}">
-                            <i class="fas fa-calendar-day"></i> Daily Report
+                            <i class="fas fa-calendar-day"></i> {% trans "Daily Report" %}
                         </a>
                     </li>
                     <li class="nav-item d-lg-none">
                         <a class="nav-link {% if request.resolver_match.url_name == 'monthly_report' %}active{% endif %}" href="{% url 'monthly_report' %}">
-                            <i class="fas fa-calendar-alt"></i> Monthly Report
+                            <i class="fas fa-calendar-alt"></i> {% trans "Monthly Report" %}
                         </a>
                     </li>
                     <li class="nav-item d-lg-none">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'customer_balance_report' %}active{% endif %}" href="{% url 'customer_balance_report' %}">
-                            <i class="fas fa-balance-scale"></i> Customer Balance
+                        <a class="nav-link {% if request.resolver_match.url_name == 'customer_export' %}active{% endif %}" href="{% url 'customer_export' %}">
+                            <i class="fas fa-file-export"></i> {% trans "Customer Data Export" %}
                         </a>
                     </li>
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav">
                     {% if user.is_authenticated %}
+                    <li class="nav-item me-2">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'customer_export' %}active{% endif %}" href="{% url 'customer_export' %}">
+                            <i class="fas fa-file-export"></i> {% trans "Export data" %}
+                        </a>
+                    </li>
+                    <!-- Language Selector - Updated Version -->
+                    <li class="nav-item dropdown me-2">
+                        <a class="nav-link dropdown-toggle" href="#" id="languageDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-globe"></i> {% if LANGUAGE_CODE == 'en' %}{% trans "English" %}{% elif LANGUAGE_CODE == 'hi' %}{% trans "हिंदी" %}{% elif LANGUAGE_CODE == 'mr' %}{% trans "मराठी" %}{% else %}{{ LANGUAGE_CODE|upper }}{% endif %}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="languageDropdown">
+                            {% load i18n %}
+                            {% get_current_language as LANGUAGE_CODE %}
+                            {% get_available_languages as LANGUAGES %}
+                            {% get_language_info_list for LANGUAGES as languages %}
+                            
+                            {% for language in languages %}
+                            <li>
+                                <form action="{% url 'set_language' %}" method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <input name="next" type="hidden" value="{{ request.path|slice:'3:' }}">
+                                    <input name="language" type="hidden" value="{{ language.code }}">
+                                    <button type="submit" class="dropdown-item {% if language.code == LANGUAGE_CODE %}active{% endif %}">
+                                        {% if language.code == 'en' %}
+                                            <i class="fas fa-check me-2 {% if language.code != LANGUAGE_CODE %}invisible{% endif %}"></i> {% trans "English" %}
+                                        {% elif language.code == 'hi' %}
+                                            <i class="fas fa-check me-2 {% if language.code != LANGUAGE_CODE %}invisible{% endif %}"></i> {% trans "हिंदी" %}
+                                        {% elif language.code == 'mr' %}
+                                            <i class="fas fa-check me-2 {% if language.code != LANGUAGE_CODE %}invisible{% endif %}"></i> {% trans "मराठी" %}
+                                        {% else %}
+                                            <i class="fas fa-check me-2 {% if language.code != LANGUAGE_CODE %}invisible{% endif %}"></i> {{ language.name_local }}
+                                        {% endif %}
+                                    </button>
+                                </form>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fas fa-user-circle"></i> {{ user.username }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                            <li><a class="dropdown-item" href="{% url 'admin:index' %}">Admin</a></li>
+                            <li><a class="dropdown-item" href="{% url 'admin:index' %}">{% trans "Admin" %}</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <form method="post" action="{% url 'logout' %}" style="margin: 0;">
                                     {% csrf_token %}
-                                    <button type="submit" class="dropdown-item">Logout</button>
+                                    <button type="submit" class="dropdown-item">{% trans "Logout" %}</button>
                                 </form>
                             </li>
                         </ul>
                     </li>
                     {% else %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'login' %}">Login</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'register' %}">Register</a>
+                        <a class="nav-link" href="{% url 'login' %}">{% trans "Login" %}</a>
                     </li>
                     {% endif %}
                 </ul>
@@ -251,48 +341,43 @@
                     <ul class="nav flex-column">
                         <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
-                                <i class="fas fa-tachometer-alt"></i> Dashboard
+                                <i class="fas fa-tachometer-alt"></i> {% trans "Dashboard" %}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if 'customer' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'customer_list' %}">
-                                <i class="fas fa-users"></i> Customers
+                                <i class="fas fa-users"></i> {% trans "Customers" %}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if 'sale' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'sale_list' %}">
-                                <i class="fas fa-bottle-water"></i> Sales
+                                <i class="fas fa-cash-register fa-fw"></i> {% trans "Sales" %}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if 'payment' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'payment_list' %}">
-                                <i class="fas fa-money-bill"></i> Payments
+                                <i class="fas fa-money-bill-wave fa-fw"></i> {% trans "Payments" %}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if 'milk_type' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'milk_type_list' %}">
-                                <i class="fas fa-list"></i> Milk Types
+                                <i class="fas fa-list"></i> {% trans "Milk Types" %}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="#" data-bs-toggle="collapse" data-bs-target="#reportsCollapse" aria-expanded="false">
-                                <i class="fas fa-chart-bar"></i> Reports <i class="fas fa-chevron-down float-end"></i>
+                                <i class="fas fa-chart-bar"></i> {% trans "Reports" %} <i class="fas fa-chevron-down float-end"></i>
                             </a>
                             <div class="collapse" id="reportsCollapse">
                                 <ul class="nav flex-column ps-3">
                                     <li class="nav-item">
                                         <a class="nav-link {% if request.resolver_match.url_name == 'daily_report' %}active{% endif %}" href="{% url 'daily_report' %}">
-                                            <i class="fas fa-calendar-day"></i> Daily Report
+                                            <i class="fas fa-calendar-day"></i> {% trans "Daily Report" %}
                                         </a>
                                     </li>
                                     <li class="nav-item">
                                         <a class="nav-link {% if request.resolver_match.url_name == 'monthly_report' %}active{% endif %}" href="{% url 'monthly_report' %}">
-                                            <i class="fas fa-calendar-alt"></i> Monthly Report
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a class="nav-link {% if request.resolver_match.url_name == 'customer_balance_report' %}active{% endif %}" href="{% url 'customer_balance_report' %}">
-                                            <i class="fas fa-balance-scale"></i> Customer Balance
+                                            <i class="fas fa-calendar-alt"></i> {% trans "Monthly Report" %}
                                         </a>
                                     </li>
                                 </ul>
@@ -323,10 +408,41 @@
         </div>
     </div>
     
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="mobile-bottom-nav">
+        <a class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
+            <i class="fas fa-tachometer-alt"></i> {% trans "Dashboard" %}
+        </a>
+        <a class="nav-item {% if 'customer' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'customer_list' %}">
+            <i class="fas fa-users"></i> {% trans "Customers" %}
+        </a>
+        <a class="nav-item {% if 'sale' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'sale_list' %}">
+            <i class="fas fa-cash-register fa-fw"></i> {% trans "Sales" %}
+        </a>
+        <a class="nav-item {% if 'payment' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'payment_list' %}">
+            <i class="fas fa-money-bill-wave fa-fw"></i> {% trans "Payments" %}
+        </a>
+        <a class="nav-item {% if 'milk_type' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'milk_type_list' %}">
+            <i class="fas fa-list"></i> {% trans "Milk Types" %}
+        </a>
+    </nav>
+    
     <!-- Footer -->
-    <footer class="py-3 text-center">
+    <footer class="footer mt-auto py-3 bg-light">
         <div class="container">
-            <p class="mb-0">© 2025 Trimurti Dairy | Developed for efficient dairy business management</p>
+            <div class="row">
+                <div class="col-12 text-center">
+                    <hr class="my-2">
+                    <div class="developer-credit p-2 d-inline-block rounded" style="background-color: var(--light-color); border: 1px solid var(--primary-color);">
+                        <strong class="text-primary">{% trans "Proudly Developed by" %}</strong>
+                        <a href="https://github.com/mayur5204" target="_blank" class="text-decoration-none ms-1">
+                            <span class="badge bg-primary p-2">
+                                <i class="fab fa-github me-1"></i> Mayur Patil
+                            </span>
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
     </footer>
     

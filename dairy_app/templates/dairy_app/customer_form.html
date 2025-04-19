@@ -1,18 +1,19 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
+{% load i18n %}
 
-{% block title %}{% if form.instance.pk %}Edit{% else %}Add{% endif %} Customer - Dairy Manager{% endblock %}
+{% block title %}{% if form.instance.pk %}{% trans "Edit" %}{% else %}{% trans "Add" %}{% endif %} {% trans "Customer" %} - {% trans "Dairy Manager" %}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">
         <i class="fas fa-{% if form.instance.pk %}edit{% else %}plus-circle{% endif %} text-primary"></i>
-        {% if form.instance.pk %}Edit{% else %}Add{% endif %} Customer
+        {% if form.instance.pk %}{% trans "Edit" %}{% else %}{% trans "Add" %}{% endif %} {% trans "Customer" %}
     </h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group me-2">
             <a href="{% if form.instance.pk %}{% url 'customer_detail' form.instance.pk %}{% else %}{% url 'customer_list' %}{% endif %}" class="btn btn-sm btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> Back
+                <i class="fas fa-arrow-left"></i> {% trans "Back" %}
             </a>
         </div>
     </div>
@@ -48,10 +49,10 @@
                     
                     <div class="mt-4 text-end">
                         <a href="{% if form.instance.pk %}{% url 'customer_detail' form.instance.pk %}{% else %}{% url 'customer_list' %}{% endif %}" class="btn btn-outline-secondary">
-                            Cancel
+                            {% trans "Cancel" %}
                         </a>
                         <button type="submit" class="btn btn-primary">
-                            {% if form.instance.pk %}Update{% else %}Save{% endif %} Customer
+                            {% if form.instance.pk %}{% trans "Update" %}{% else %}{% trans "Save" %}{% endif %} {% trans "Customer" %}
                         </button>
                     </div>
                 </form>

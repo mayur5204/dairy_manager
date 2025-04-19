@@ -1,27 +1,28 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
+{% load i18n %}
 
-{% block title %}Monthly Report - Dairy Manager{% endblock %}
+{% block title %}{% trans "Monthly Report" %} - {% trans "Dairy Manager" %}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-calendar-alt text-primary"></i> Monthly Sales Report</h1>
+    <h1 class="h2"><i class="fas fa-calendar-alt text-primary"></i> {% trans "Monthly Sales Report" %}</h1>
 </div>
 
-<!-- Date Range Filter -->
+<!-- Month-Year Selection Filter -->
 <div class="card mb-4">
     <div class="card-body">
         <form method="post" class="row g-3 align-items-end">
             {% csrf_token %}
             <div class="col-md-4">
-                {{ form.start_date|as_crispy_field }}
+                {{ form.month|as_crispy_field }}
             </div>
             <div class="col-md-4">
-                {{ form.end_date|as_crispy_field }}
+                {{ form.year|as_crispy_field }}
             </div>
             <div class="col-md-4">
                 <button type="submit" class="btn btn-primary w-100">
-                    <i class="fas fa-filter"></i> Filter Report
+                    <i class="fas fa-filter"></i> {% trans "Filter Report" %}
                 </button>
             </div>
         </form>
@@ -32,24 +33,28 @@
 {% if report_data %}
 <div class="card">
     <div class="card-header">
-        <h5 class="mb-0">Monthly Report: {{ start_date|date:"M Y" }} to {{ end_date|date:"M Y" }}</h5>
+        <h5 class="mb-0">{% trans "Monthly Report" %}: {% trans month_name %} {{ year }}</h5>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-striped table-hover">
                 <thead>
                     <tr>
-                        <th>Month</th>
-                        <th>Total Quantity (L)</th>
-                        <th>Sales Amount (₹)</th>
-                        <th>Payments (₹)</th>
-                        <th>Balance (₹)</th>
+                        <th>{% trans "Month" %}</th>
+                        <th>{% trans "Total Quantity" %} (L)</th>
+                        <th>{% trans "Sales Amount" %} (₹)</th>
+                        <th>{% trans "Payments" %} (₹)</th>
+                        <th>{% trans "Balance" %} (₹)</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for month_data in report_data %}
                     <tr>
-                        <td>{{ month_data.month|date:"F Y" }}</td>
+                        <td>
+                            {% with month_name=month_data.month|date:"F" year=month_data.month|date:"Y" %}
+                                {% trans month_name %} {{ year }}
+                            {% endwith %}
+                        </td>
                         <td>{{ month_data.total_quantity|floatformat:1 }}</td>
                         <td>{{ month_data.total_amount|floatformat:2 }}</td>
                         <td>{{ month_data.total_payment|floatformat:2 }}</td>
@@ -61,7 +66,7 @@
                 </tbody>
                 <tfoot class="table-primary fw-bold">
                     <tr>
-                        <td>Summary</td>
+                        <td>{% trans "Summary" %}</td>
                         <td>{{ total_quantity|floatformat:1 }} L</td>
                         <td>₹{{ total_sales|floatformat:2 }}</td>
                         <td>₹{{ total_payments|floatformat:2 }}</td>
@@ -76,7 +81,7 @@
 <!-- Chart Container -->
 <div class="card mt-4">
     <div class="card-header">
-        <h5 class="mb-0">Monthly Performance Chart</h5>
+        <h5 class="mb-0">{% trans "Monthly Performance Chart" %}</h5>
     </div>
     <div class="card-body">
         <canvas id="monthlyChart" height="300"></canvas>
@@ -86,8 +91,8 @@
 <div class="card">
     <div class="card-body text-center py-5">
         <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
-        <p class="lead">No data available for the selected period</p>
-        <p class="text-muted">Please select a different date range or record sales for this period</p>
+        <p class="lead">{% trans "No data available for the selected month" %}</p>
+        <p class="text-muted">{% trans "Please select a different month or record sales for this month" %}</p>
     </div>
 </div>
 {% endif %}
@@ -100,7 +105,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const ctx = document.getElementById('monthlyChart').getContext('2d');
     
     // Extract data
-    const months = [{% for month_data in report_data %}'{{ month_data.month|date:"M Y" }}',{% endfor %}];
+    const months = [{% for month_data in report_data %}
+        '{% with month_name=month_data.month|date:"M" year=month_data.month|date:"Y" %}{% trans month_name %} {{ year }}{% endwith %}',
+    {% endfor %}];
     const sales = [{% for month_data in report_data %}{{ month_data.total_amount }},{% endfor %}];
     const payments = [{% for month_data in report_data %}{{ month_data.total_payment }},{% endfor %}];
     const balances = [{% for month_data in report_data %}{{ month_data.balance }},{% endfor %}];
@@ -117,21 +124,21 @@ document.addEventListener('DOMContentLoaded', function() {
             labels: months,
             datasets: [
                 {
-                    label: 'Sales (₹)',
+                    label: '{% trans "Sales" %} (₹)',
                     data: sales,
                     backgroundColor: 'rgba(76, 175, 80, 0.7)',
                     borderColor: 'rgba(76, 175, 80, 1)',
                     borderWidth: 1
                 },
                 {
-                    label: 'Payments (₹)',
+                    label: '{% trans "Payments" %} (₹)',
                     data: payments,
                     backgroundColor: 'rgba(33, 150, 243, 0.7)',
                     borderColor: 'rgba(33, 150, 243, 1)',
                     borderWidth: 1
                 },
                 {
-                    label: 'Balance (₹)',
+                    label: '{% trans "Balance" %} (₹)',
                     data: balances,
                     type: 'line',
                     backgroundColor: 'rgba(255, 193, 7, 0.2)',
@@ -150,14 +157,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     beginAtZero: true,
                     title: {
                         display: true,
-                        text: 'Amount (₹)'
+                        text: '{% trans "Amount" %} (₹)'
                     }
                 }
             },
             plugins: {
                 title: {
                     display: true,
-                    text: 'Monthly Sales, Payments and Balance'
+                    text: '{% trans "Monthly Sales, Payments and Balance" %}'
                 },
                 tooltip: {
                     mode: 'index',

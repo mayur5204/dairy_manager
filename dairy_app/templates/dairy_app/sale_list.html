@@ -1,17 +1,15 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Sales - Dairy Manager{% endblock %}
+{% block title %}{% trans "Sales - Dairy Manager" %}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-milk text-primary"></i> Sales</h1>
+    <h1 class="h2"><i class="fas fa-cash-register text-primary"></i> {% trans "Sales" %}</h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group me-2">
             <a href="{% url 'sale_add' %}" class="btn btn-sm btn-primary">
-                <i class="fas fa-plus-circle"></i> Add Sale
-            </a>
-            <a href="{% url 'sale_batch_input' %}" class="btn btn-sm btn-accent">
-                <i class="fas fa-th"></i> Batch Input
+                <i class="fas fa-plus-circle"></i> {% trans "Add Sale" %}
             </a>
         </div>
     </div>
@@ -24,13 +22,13 @@
             <table class="table table-striped table-hover">
                 <thead>
                     <tr>
-                        <th>Date</th>
-                        <th>Customer</th>
-                        <th>Milk Type</th>
-                        <th>Quantity (L)</th>
-                        <th>Rate (₹)</th>
-                        <th>Amount (₹)</th>
-                        <th>Actions</th>
+                        <th>{% trans "Date" %}</th>
+                        <th>{% trans "Customer" %}</th>
+                        <th>{% trans "Milk Type" %}</th>
+                        <th>{% trans "Quantity" %} (L)</th>
+                        <th>{% trans "Rate" %} (₹)</th>
+                        <th>{% trans "Amount" %} (₹)</th>
+                        <th>{% trans "Actions" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -49,10 +47,10 @@
                         <td>
                             <div class="btn-group btn-group-sm">
                                 <a href="{% url 'sale_edit' sale.id %}" class="btn btn-outline-primary">
-                                    <i class="fas fa-edit"></i> Edit
+                                    <i class="fas fa-edit"></i> {% trans "Edit" %}
                                 </a>
                                 <a href="{% url 'sale_delete' sale.id %}" class="btn btn-outline-danger">
-                                    <i class="fas fa-trash"></i> Delete
+                                    <i class="fas fa-trash"></i> {% trans "Delete" %}
                                 </a>
                             </div>
                         </td>
@@ -81,7 +79,7 @@
                 {% for num in page_obj.paginator.page_range %}
                     {% if page_obj.number == num %}
                     <li class="page-item active">
-                        <span class="page-link">{{ num }} <span class="sr-only">(current)</span></span>
+                        <span class="page-link">{{ num }} <span class="sr-only">({% trans "current" %})</span></span>
                     </li>
                     {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
                     <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
@@ -107,14 +105,11 @@
         {% else %}
         <div class="text-center py-5">
             <i class="fas fa-milk fa-3x text-muted mb-3"></i>
-            <p class="lead">No sales records found</p>
-            <p class="text-muted">Record your milk sales to start tracking your business</p>
+            <p class="lead">{% trans "No sales records found" %}</p>
+            <p class="text-muted">{% trans "Record your milk sales to start tracking your business" %}</p>
             <div class="mt-3">
-                <a href="{% url 'sale_add' %}" class="btn btn-primary me-2">
-                    <i class="fas fa-plus-circle"></i> Add Sale
-                </a>
-                <a href="{% url 'sale_batch_input' %}" class="btn btn-accent">
-                    <i class="fas fa-th"></i> Batch Input
+                <a href="{% url 'sale_add' %}" class="btn btn-primary">
+                    <i class="fas fa-plus-circle"></i> {% trans "Add Sale" %}
                 </a>
             </div>
         </div>

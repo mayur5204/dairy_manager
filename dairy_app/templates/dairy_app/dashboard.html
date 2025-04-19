@@ -1,17 +1,18 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Dashboard - Trimurti Dairy{% endblock %}
+{% block title %}{% trans "Dashboard - Trimurti Dairy" %}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-tachometer-alt text-primary"></i> Dashboard</h1>
+    <h1 class="h2"><i class="fas fa-tachometer-alt text-primary"></i> {% trans "Dashboard" %}</h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group me-2">
             <a href="{% url 'sale_add' %}" class="btn btn-sm btn-primary">
-                <i class="fas fa-plus-circle"></i> Record Sale
+                <i class="fas fa-plus-circle"></i> {% trans "Record Sale" %}
             </a>
             <a href="{% url 'payment_add' %}" class="btn btn-sm btn-accent">
-                <i class="fas fa-money-bill"></i> Record Payment
+                <i class="fas fa-money-bill"></i> {% trans "Record Payment" %}
             </a>
         </div>
     </div>
@@ -25,9 +26,9 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col-8">
-                        <h6 class="card-title text-uppercase">Today's Sales</h6>
+                        <h6 class="card-title text-uppercase">{% trans "Today's Sales" %}</h6>
                         <h3 class="card-value">₹{{ today_total_amount|floatformat:2 }}</h3>
-                        <span class="text-muted">{{ today_total_quantity|floatformat:1 }} liters</span>
+                        <span class="text-muted">{{ today_total_quantity|floatformat:1 }} {% trans "liters" %}</span>
                     </div>
                     <div class="col-4 text-end">
                         <div class="card-icon">
@@ -45,9 +46,9 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col-8">
-                        <h6 class="card-title text-uppercase">This Month's Sales</h6>
+                        <h6 class="card-title text-uppercase">{% trans "This Month's Sales" %}</h6>
                         <h3 class="card-value">₹{{ month_total_amount|floatformat:2 }}</h3>
-                        <span class="text-muted">Total for {{ today|date:"F Y" }}</span>
+                        <span class="text-muted">{% trans "Total for" %} {{ today|date:"F Y" }}</span>
                     </div>
                     <div class="col-4 text-end">
                         <div class="card-icon">
@@ -65,9 +66,9 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col-8">
-                        <h6 class="card-title text-uppercase">This Month's Payments</h6>
+                        <h6 class="card-title text-uppercase">{% trans "This Month's Payments" %}</h6>
                         <h3 class="card-value">₹{{ month_total_payment|floatformat:2 }}</h3>
-                        <span class="text-muted">Total for {{ today|date:"F Y" }}</span>
+                        <span class="text-muted">{% trans "Total for" %} {{ today|date:"F Y" }}</span>
                     </div>
                     <div class="col-4 text-end">
                         <div class="card-icon">
@@ -85,10 +86,10 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col-8">
-                        <h6 class="card-title text-uppercase">Customers</h6>
+                        <h6 class="card-title text-uppercase">{% trans "Customers" %}</h6>
                         <h3 class="card-value">{{ customers_count }}</h3>
                         <span class="text-muted">
-                            <a href="{% url 'customer_list' %}" class="text-decoration-none">View all</a>
+                            <a href="{% url 'customer_list' %}" class="text-decoration-none">{% trans "View all" %}</a>
                         </span>
                     </div>
                     <div class="col-4 text-end">
@@ -107,7 +108,7 @@
     <div class="col-lg-6 mb-4">
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between">
-                <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i> Today's Milk Distribution</h5>
+                <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i> {% trans "Today's Milk Distribution" %}</h5>
                 <span class="text-muted">{{ today|date:"d M, Y" }}</span>
             </div>
             <div class="card-body">
@@ -116,16 +117,16 @@
                     <table class="table">
                         <thead>
                             <tr>
-                                <th>Milk Type</th>
-                                <th>Quantity</th>
-                                <th>Amount</th>
+                                <th>{% trans "Milk Type" %}</th>
+                                <th>{% trans "Quantity" %}</th>
+                                <th>{% trans "Amount" %}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for item in milk_type_distribution %}
                             <tr>
                                 <td>{{ item.name }}</td>
-                                <td>{{ item.quantity|floatformat:1 }} liters</td>
+                                <td>{{ item.quantity|floatformat:1 }} {% trans "liters" %}</td>
                                 <td>₹{{ item.amount|floatformat:2 }}</td>
                             </tr>
                             {% endfor %}
@@ -138,8 +139,8 @@
                 {% else %}
                 <div class="text-center py-5">
                     <i class="fas fa-chart-pie fa-3x text-muted mb-3"></i>
-                    <p>No milk distribution data for today</p>
-                    <a href="{% url 'sale_add' %}" class="btn btn-sm btn-primary">Record Today's Sales</a>
+                    <p>{% trans "No milk distribution data for today" %}</p>
+                    <a href="{% url 'sale_add' %}" class="btn btn-sm btn-primary">{% trans "Record Today's Sales" %}</a>
                 </div>
                 {% endif %}
             </div>
@@ -150,7 +151,7 @@
     <div class="col-lg-6 mb-4">
         <div class="card h-100">
             <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-history me-2"></i> Recent Activities</h5>
+                <h5 class="mb-0"><i class="fas fa-history me-2"></i> {% trans "Recent Activities" %}</h5>
             </div>
             <div class="card-body p-0">
                 <div class="list-group list-group-flush">
@@ -158,11 +159,11 @@
                     {% for sale in recent_sales %}
                     <div class="list-group-item">
                         <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">Sale: {{ sale.quantity|floatformat:1 }} liters of {{ sale.milk_type.name }}</h6>
+                            <h6 class="mb-1">{% trans "Sale" %}: {{ sale.quantity|floatformat:1 }} {% trans "liters of" %} {{ sale.milk_type.name }}</h6>
                             <small>{{ sale.date|date:"d M, Y" }}</small>
                         </div>
-                        <p class="mb-1">To customer: {{ sale.customer.name }}</p>
-                        <small class="text-muted">Amount: ₹{{ sale.quantity|floatformat:1 }} × {{ sale.rate|floatformat:2 }} = ₹{{ sale.total_amount|floatformat:2 }}</small>
+                        <p class="mb-1">{% trans "To customer" %}: {{ sale.customer.name }}</p>
+                        <small class="text-muted">{% trans "Amount" %}: ₹{{ sale.quantity|floatformat:1 }} × {{ sale.rate|floatformat:2 }} = ₹{{ sale.total_amount|floatformat:2 }}</small>
                     </div>
                     {% endfor %}
                     
@@ -170,26 +171,26 @@
                     {% for payment in recent_payments %}
                     <div class="list-group-item">
                         <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">Payment: ₹{{ payment.amount|floatformat:2 }}</h6>
+                            <h6 class="mb-1">{% trans "Payment" %}: ₹{{ payment.amount|floatformat:2 }}</h6>
                             <small>{{ payment.date|date:"d M, Y" }}</small>
                         </div>
-                        <p class="mb-1">From customer: {{ payment.customer.name }}</p>
-                        <small class="text-muted">Description: {{ payment.description|default:"No description" }}</small>
+                        <p class="mb-1">{% trans "From customer" %}: {{ payment.customer.name }}</p>
+                        <small class="text-muted">{% trans "Description" %}: {{ payment.description|default:_("No description") }}</small>
                     </div>
                     {% endfor %}
                     
                     {% if not recent_sales and not recent_payments %}
                     <div class="list-group-item text-center py-5">
                         <i class="fas fa-clock fa-3x text-muted mb-3"></i>
-                        <p>No recent activities</p>
+                        <p>{% trans "No recent activities" %}</p>
                     </div>
                     {% endif %}
                 </div>
             </div>
             <div class="card-footer text-center">
                 <div class="btn-group">
-                    <a href="{% url 'sale_list' %}" class="btn btn-sm btn-outline-primary">All Sales</a>
-                    <a href="{% url 'payment_list' %}" class="btn btn-sm btn-outline-primary">All Payments</a>
+                    <a href="{% url 'sale_list' %}" class="btn btn-sm btn-outline-primary">{% trans "All Sales" %}</a>
+                    <a href="{% url 'payment_list' %}" class="btn btn-sm btn-outline-primary">{% trans "All Payments" %}</a>
                 </div>
             </div>
         </div>
@@ -235,7 +236,7 @@
                     },
                     title: {
                         display: true,
-                        text: 'Milk Quantity Distribution (Liters)'
+                        text: '{% trans "Milk Quantity Distribution (Liters)" %}'
                     },
                     tooltip: {
                         callbacks: {
@@ -244,7 +245,7 @@
                                 const value = context.raw || 0;
                                 const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
                                 const percentage = Math.round((value * 100) / total);
-                                return `${label}: ${value.toFixed(1)} liters (${percentage}%)`;
+                                return `${label}: ${value.toFixed(1)} {% trans "liters" %} (${percentage}%)`;
                             }
                         }
                     }

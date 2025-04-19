@@ -1,13 +1,14 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Register - Trimurti Dairy{% endblock %}
+{% block title %}{% trans "Register" %} - {% trans "Trimurti Dairy" %}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-6">
         <div class="card shadow">
             <div class="card-header text-center py-3">
-                <h4 class="mb-0"><i class="fas fa-user-plus"></i> Register for Trimurti Dairy</h4>
+                <h4 class="mb-0"><i class="fas fa-user-plus"></i> {% trans "Register for Trimurti Dairy" %}</h4>
             </div>
             <div class="card-body p-4">
                 <form method="post">
@@ -15,7 +16,7 @@
                     
                     {% if form.errors %}
                     <div class="alert alert-danger">
-                        <p>Please correct the errors below:</p>
+                        <p>{% trans "Please correct the errors below:" %}</p>
                         <ul>
                             {% for field, errors in form.errors.items %}
                                 {% for error in errors %}
@@ -27,16 +28,16 @@
                     {% endif %}
                     
                     <div class="mb-3">
-                        <label for="id_username" class="form-label">Username:</label>
+                        <label for="id_username" class="form-label">{% trans "Username" %}:</label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="fas fa-user"></i></span>
                             <input type="text" name="username" id="id_username" class="form-control" required autofocus>
                         </div>
-                        <small class="text-muted">Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.</small>
+                        <small class="text-muted">{% trans "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only." %}</small>
                     </div>
                     
                     <div class="mb-3">
-                        <label for="id_email" class="form-label">Email:</label>
+                        <label for="id_email" class="form-label">{% trans "Email" %}:</label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="fas fa-envelope"></i></span>
                             <input type="email" name="email" id="id_email" class="form-control" required>
@@ -44,34 +45,34 @@
                     </div>
                     
                     <div class="mb-3">
-                        <label for="id_password1" class="form-label">Password:</label>
+                        <label for="id_password1" class="form-label">{% trans "Password" %}:</label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="fas fa-lock"></i></span>
                             <input type="password" name="password1" id="id_password1" class="form-control" required>
                         </div>
                         <small class="text-muted">
-                            Your password must contain at least 8 characters and can't be entirely numeric.
+                            {% trans "Your password must contain at least 8 characters and can't be entirely numeric." %}
                         </small>
                     </div>
                     
                     <div class="mb-4">
-                        <label for="id_password2" class="form-label">Confirm Password:</label>
+                        <label for="id_password2" class="form-label">{% trans "Confirm Password" %}:</label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="fas fa-lock"></i></span>
                             <input type="password" name="password2" id="id_password2" class="form-control" required>
                         </div>
-                        <small class="text-muted">Enter the same password as before, for verification.</small>
+                        <small class="text-muted">{% trans "Enter the same password as before, for verification." %}</small>
                     </div>
                     
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-primary py-2">
-                            <i class="fas fa-user-plus me-2"></i> Register
+                            <i class="fas fa-user-plus me-2"></i> {% trans "Register" %}
                         </button>
                     </div>
                 </form>
             </div>
             <div class="card-footer text-center py-3">
-                <p class="mb-0">Already have an account? <a href="{% url 'login' %}" class="text-decoration-none">Login</a></p>
+                <p class="mb-0">{% trans "Already have an account?" %} <a href="{% url 'login' %}" class="text-decoration-none">{% trans "Login" %}</a></p>
             </div>
         </div>
     </div>

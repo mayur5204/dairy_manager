@@ -4,7 +4,6 @@ from . import views
 
 urlpatterns = [
     # Authentication URLs
-    path('register/', views.register_view, name='register'),
     path('login/', auth_views.LoginView.as_view(template_name='dairy_app/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     
@@ -23,11 +22,11 @@ urlpatterns = [
     path('customers/<int:pk>/', views.CustomerDetailView.as_view(), name='customer_detail'),
     path('customers/<int:pk>/edit/', views.CustomerUpdateView.as_view(), name='customer_edit'),
     path('customers/<int:pk>/delete/', views.CustomerDeleteView.as_view(), name='customer_delete'),
+    path('search-customers/', views.search_customers, name='search_customers'),
     
     # Sale URLs
     path('sales/', views.SaleListView.as_view(), name='sale_list'),
     path('sales/add/', views.sale_create_view, name='sale_add'),
-    path('sales/batch-input/', views.batch_sale_input, name='sale_batch_input'),
     path('sales/<int:pk>/edit/', views.SaleUpdateView.as_view(), name='sale_edit'),
     path('sales/<int:pk>/delete/', views.SaleDeleteView.as_view(), name='sale_delete'),
     path('ajax/get-milk-types/', views.get_milk_types_for_customer, name='get_milk_types_for_customer'),
@@ -42,5 +41,6 @@ urlpatterns = [
     # Report URLs
     path('reports/daily/', views.daily_report_view, name='daily_report'),
     path('reports/monthly/', views.monthly_report_view, name='monthly_report'),
-    path('reports/customer-balance/', views.customer_balance_report_view, name='customer_balance_report'),
+    path('reports/customer-export/', views.customer_export_view, name='customer_export'),
+    path('reports/customer-export/download/', views.download_customer_data, name='download_customer_data'),
 ]

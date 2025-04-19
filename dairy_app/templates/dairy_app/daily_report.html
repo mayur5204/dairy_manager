@@ -1,11 +1,12 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
+{% load i18n %}
 
-{% block title %}Daily Report - Dairy Manager{% endblock %}
+{% block title %}{% trans "Daily Report" %} - {% trans "Dairy Manager" %}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-calendar-day text-primary"></i> Daily Sales Report</h1>
+    <h1 class="h2"><i class="fas fa-calendar-day text-primary"></i> {% trans "Daily Sales Report" %}</h1>
 </div>
 
 <!-- Date Range Filter -->
@@ -21,7 +22,7 @@
             </div>
             <div class="col-md-4">
                 <button type="submit" class="btn btn-primary w-100">
-                    <i class="fas fa-filter"></i> Filter Report
+                    <i class="fas fa-filter"></i> {% trans "Filter Report" %}
                 </button>
             </div>
         </form>
@@ -32,17 +33,17 @@
 {% if report_data %}
 <div class="card">
     <div class="card-header">
-        <h5 class="mb-0">Sales Report: {{ start_date|date:"d M, Y" }} to {{ end_date|date:"d M, Y" }}</h5>
+        <h5 class="mb-0">{% trans "Sales Report" %}: {{ start_date|date:"d M, Y" }} {% trans "to" %} {{ end_date|date:"d M, Y" }}</h5>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-striped table-hover">
                 <thead>
                     <tr>
-                        <th>Date</th>
-                        <th>Total Quantity (L)</th>
-                        <th>Milk Types</th>
-                        <th>Total Amount (₹)</th>
+                        <th>{% trans "Date" %}</th>
+                        <th>{% trans "Total Quantity (L)" %}</th>
+                        <th>{% trans "Milk Types" %}</th>
+                        <th>{% trans "Total Amount (₹)" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -64,9 +65,9 @@
                 </tbody>
                 <tfoot class="table-primary fw-bold">
                     <tr>
-                        <td>Summary</td>
+                        <td>{% trans "Summary" %}</td>
                         <td>{{ total_quantity|floatformat:1 }} L</td>
-                        <td>{{ report_data|length }} day(s)</td>
+                        <td>{{ report_data|length }} {% trans "day(s)" %}</td>
                         <td>₹{{ total_amount|floatformat:2 }}</td>
                     </tr>
                 </tfoot>
@@ -78,7 +79,7 @@
 <!-- Chart Container -->
 <div class="card mt-4">
     <div class="card-header">
-        <h5 class="mb-0">Daily Sales Chart</h5>
+        <h5 class="mb-0">{% trans "Daily Sales Chart" %}</h5>
     </div>
     <div class="card-body">
         <canvas id="dailySalesChart" height="300"></canvas>
@@ -88,8 +89,8 @@
 <div class="card">
     <div class="card-body text-center py-5">
         <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
-        <p class="lead">No sales data available for the selected period</p>
-        <p class="text-muted">Please select a different date range or record sales for this period</p>
+        <p class="lead">{% trans "No sales data available for the selected period" %}</p>
+        <p class="text-muted">{% trans "Please select a different date range or record sales for this period" %}</p>
     </div>
 </div>
 {% endif %}
@@ -117,7 +118,7 @@ document.addEventListener('DOMContentLoaded', function() {
             labels: dates,
             datasets: [
                 {
-                    label: 'Quantity (L)',
+                    label: '{% trans "Quantity (L)" %}',
                     data: quantities,
                     backgroundColor: 'rgba(76, 175, 80, 0.5)',
                     borderColor: 'rgba(76, 175, 80, 1)',
@@ -125,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     yAxisID: 'y'
                 },
                 {
-                    label: 'Amount (₹)',
+                    label: '{% trans "Amount (₹)" %}',
                     data: amounts,
                     type: 'line',
                     backgroundColor: 'rgba(33, 150, 243, 0.5)',
@@ -146,7 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     position: 'left',
                     title: {
                         display: true,
-                        text: 'Quantity (L)'
+                        text: '{% trans "Quantity (L)" %}'
                     }
                 },
                 y1: {
@@ -154,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     position: 'right',
                     title: {
                         display: true,
-                        text: 'Amount (₹)'
+                        text: '{% trans "Amount (₹)" %}'
                     },
                     grid: {
                         drawOnChartArea: false
@@ -164,7 +165,7 @@ document.addEventListener('DOMContentLoaded', function() {
             plugins: {
                 title: {
                     display: true,
-                    text: 'Daily Sales Overview'
+                    text: '{% trans "Daily Sales Overview" %}'
                 },
                 tooltip: {
                     mode: 'index',
