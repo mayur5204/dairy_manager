@@ -117,7 +117,8 @@
                                                                value="{{ current_quantity }}"
                                                            {% else %}
                                                                disabled
-                                                           {% endif %}>
+                                                           {% endif %}
+                                                           data-milk-type-id="{{ milk_type.id }}">
                                                     <span class="input-group-text">{% trans "liters" %}</span>
                                                 </div>
                                             </div>
@@ -141,12 +142,6 @@
                         </div>
                     </div>
                     
-                    <div class="row">
-                        <div class="col-md-12">
-                            {{ form.notes|as_crispy_field }}
-                        </div>
-                    </div>
-                    
                     <div class="mt-4 text-end">
                         <a href="{% url 'sale_list' %}" class="btn btn-outline-secondary">{% trans "Cancel" %}</a>
                         <button type="submit" class="btn btn-primary">
@@ -162,6 +157,13 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Store last sale quantities for each milk type
+    const lastSaleQuantities = {
+        {% for milk_type_id, quantity in last_sale_quantities.items %}
+            {{ milk_type_id }}: {{ quantity }},
+        {% endfor %}
+    };
+
     // Handle milk type checkbox selection and quantity input enablement
     const milkTypeCheckboxes = document.querySelectorAll('.milk-type-checkbox');
 
@@ -175,6 +177,10 @@ document.addEventListener('DOMContentLoaded', function() {
             quantityInput.disabled = !this.checked;
             
             if (this.checked) {
+                // Auto-fill with the last sale quantity if available
+                if (lastSaleQuantities[milkTypeId]) {
+                    quantityInput.value = lastSaleQuantities[milkTypeId];
+                }
                 quantityInput.focus();
             } else {
                 quantityInput.value = '';

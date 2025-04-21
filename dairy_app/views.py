@@ -700,16 +700,29 @@ def sale_create_view(request):
     
     # Handle customer selection
     customer_id = request.GET.get('customer')
+    last_sale_quantities = {}
+    
     if customer_id:
         try:
             customer = Customer.objects.get(id=customer_id)
             customer_milk_types = customer.milk_types.all()
+            
+            # Get the last sale quantity for each milk type for this customer
+            for milk_type in customer_milk_types:
+                last_sale = Sale.objects.filter(
+                    customer=customer, 
+                    milk_type=milk_type
+                ).order_by('-created_at').first()
+                
+                if last_sale:
+                    last_sale_quantities[milk_type.id] = last_sale.quantity
+            
             form = SaleForm(initial={'customer': customer})
         except Customer.DoesNotExist:
             form = SaleForm()
     else:
         form = SaleForm()
-    
+
     if request.method == 'POST':
         # Check if we're handling batch input
         if 'milk_types[]' in request.POST:
@@ -717,7 +730,6 @@ def sale_create_view(request):
             quantities = request.POST.getlist('quantities[]')
             customer_id = request.POST.get('customer')
             date = request.POST.get('date')
-            notes = request.POST.get('notes', '')
             
             # Use the first admin user as default owner for all records
             first_user = User.objects.filter(is_superuser=True).first() or request.user
@@ -749,7 +761,7 @@ def sale_create_view(request):
                                 date=date,
                                 quantity=quantity,
                                 rate=milk_type.rate_per_liter,
-                                notes=notes
+                                notes=''  # Empty string instead of retrieving from POST
                             )
                             sales_created += 1
                         except MilkType.DoesNotExist:
@@ -775,6 +787,8 @@ def sale_create_view(request):
                 # If rate not provided, use the milk type's rate
                 if not sale.rate:
                     sale.rate = sale.milk_type.rate_per_liter
+                # Set notes to empty string
+                sale.notes = ''
                 sale.save()
                 messages.success(request, "Sale recorded successfully!")
                 return redirect('sale_list')
@@ -785,6 +799,7 @@ def sale_create_view(request):
         'from_customer_page': from_customer_page,
         'customer_milk_types': customer_milk_types,
         'search_results': search_results,
+        'last_sale_quantities': last_sale_quantities,
     }
     
     return render(request, 'dairy_app/sale_form.html', context)
