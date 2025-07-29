@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Area Customers" %} | {% trans "Trimurti Dairy" %}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>{% trans "Customers in" %} {{ area.name }}</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'customer_add' %}?area={{ area.id }}" class="btn btn-success">
+                <i class="fas fa-plus"></i> {% trans "Add Customer to This Area" %}
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="row mb-3">
+        <div class="col">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">{% trans "Customers" %}</h5>
+                <a href="{% url 'area_list' %}" class="btn btn-sm btn-secondary">
+                    <i class="fas fa-arrow-left"></i> {% trans "Back to Areas" %}
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if customers %}
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>{% trans "Name" %}</th>
+                            <th>{% trans "Phone" %}</th>
+                            <th>{% trans "Address" %}</th>
+                            <th>{% trans "Actions" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for customer in customers %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ customer.name }}</td>
+                            <td>{{ customer.phone|default:"-" }}</td>
+                            <td>{{ customer.address|default:"-" }}</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'customer_detail' customer.id %}" class="btn btn-sm btn-info">
+                                        <i class="fas fa-eye"></i> {% trans "View" %}
+                                    </a>
+                                    <a href="{% url 'customer_edit' customer.id %}" class="btn btn-sm btn-warning">
+                                        <i class="fas fa-edit"></i> {% trans "Edit" %}
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                {% trans "No customers are assigned to this area yet." %}
+                <a href="{% url 'customer_add' %}?area={{ area.id }}" class="alert-link">
+                    {% trans "Add a customer to this area" %}
+                </a>.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -230,6 +230,11 @@
                         </a>
                     </li>
                     <li class="nav-item d-lg-none">
+                        <a class="nav-link {% if 'area' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'area_list' %}">
+                            <i class="fas fa-map-marker-alt"></i> {% trans "Areas" %}
+                        </a>
+                    </li>
+                    <li class="nav-item d-lg-none">
                         <a class="nav-link {% if 'customer' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'customer_list' %}">
                             <i class="fas fa-users"></i> {% trans "Customers" %}
                         </a>
@@ -342,6 +347,11 @@
                         <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
                                 <i class="fas fa-tachometer-alt"></i> {% trans "Dashboard" %}
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'area' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'area_list' %}">
+                                <i class="fas fa-map-marker-alt"></i> {% trans "Areas" %}
                             </a>
                         </li>
                         <li class="nav-item">

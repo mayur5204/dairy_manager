@@ -20,68 +20,8 @@
 
 <!-- Stats Cards Row -->
 <div class="row mb-4">
-    <!-- Today's Sales Card -->
-    <div class="col-md-6 col-xl-3 mb-4">
-        <div class="card stats-card h-100">
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-8">
-                        <h6 class="card-title text-uppercase">{% trans "Today's Sales" %}</h6>
-                        <h3 class="card-value">₹{{ today_total_amount|floatformat:2 }}</h3>
-                        <span class="text-muted">{{ today_total_quantity|floatformat:1 }} {% trans "liters" %}</span>
-                    </div>
-                    <div class="col-4 text-end">
-                        <div class="card-icon">
-                            <i class="fas fa-bottle-water"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Month's Sales Card -->
-    <div class="col-md-6 col-xl-3 mb-4">
-        <div class="card stats-card h-100">
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-8">
-                        <h6 class="card-title text-uppercase">{% trans "This Month's Sales" %}</h6>
-                        <h3 class="card-value">₹{{ month_total_amount|floatformat:2 }}</h3>
-                        <span class="text-muted">{% trans "Total for" %} {{ today|date:"F Y" }}</span>
-                    </div>
-                    <div class="col-4 text-end">
-                        <div class="card-icon">
-                            <i class="fas fa-calendar-alt"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Month's Payments Card -->
-    <div class="col-md-6 col-xl-3 mb-4">
-        <div class="card stats-card h-100">
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-8">
-                        <h6 class="card-title text-uppercase">{% trans "This Month's Payments" %}</h6>
-                        <h3 class="card-value">₹{{ month_total_payment|floatformat:2 }}</h3>
-                        <span class="text-muted">{% trans "Total for" %} {{ today|date:"F Y" }}</span>
-                    </div>
-                    <div class="col-4 text-end">
-                        <div class="card-icon">
-                            <i class="fas fa-money-bill"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Customers Card -->
-    <div class="col-md-6 col-xl-3 mb-4">
+    <div class="col-md-6 col-xl-6 mb-4">
         <div class="card stats-card h-100">
             <div class="card-body">
                 <div class="row">
@@ -101,54 +41,33 @@
             </div>
         </div>
     </div>
-</div>
-
-<div class="row">
-    <!-- Today's Milk Type Distribution -->
-    <div class="col-lg-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between">
-                <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i> {% trans "Today's Milk Distribution" %}</h5>
-                <span class="text-muted">{{ today|date:"d M, Y" }}</span>
-            </div>
+    
+    <!-- Areas Card -->
+    <div class="col-md-6 col-xl-6 mb-4">
+        <div class="card stats-card h-100">
             <div class="card-body">
-                {% if milk_type_distribution %}
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>{% trans "Milk Type" %}</th>
-                                <th>{% trans "Quantity" %}</th>
-                                <th>{% trans "Amount" %}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in milk_type_distribution %}
-                            <tr>
-                                <td>{{ item.name }}</td>
-                                <td>{{ item.quantity|floatformat:1 }} {% trans "liters" %}</td>
-                                <td>₹{{ item.amount|floatformat:2 }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="row">
+                    <div class="col-8">
+                        <h6 class="card-title text-uppercase">{% trans "Delivery Areas" %}</h6>
+                        <h3 class="card-value">{{ areas_count }}</h3>
+                        <span class="text-muted">
+                            <a href="{% url 'area_list' %}" class="text-decoration-none">{% trans "Manage areas" %}</a>
+                        </span>
+                    </div>
+                    <div class="col-4 text-end">
+                        <div class="card-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                    </div>
                 </div>
-                <div class="mt-3">
-                    <canvas id="milkDistributionChart" height="200"></canvas>
-                </div>
-                {% else %}
-                <div class="text-center py-5">
-                    <i class="fas fa-chart-pie fa-3x text-muted mb-3"></i>
-                    <p>{% trans "No milk distribution data for today" %}</p>
-                    <a href="{% url 'sale_add' %}" class="btn btn-sm btn-primary">{% trans "Record Today's Sales" %}</a>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>
+</div>
 
+<div class="row">
     <!-- Recent Activities -->
-    <div class="col-lg-6 mb-4">
+    <div class="col-lg-12 mb-4">
         <div class="card h-100">
             <div class="card-header">
                 <h5 class="mb-0"><i class="fas fa-history me-2"></i> {% trans "Recent Activities" %}</h5>
@@ -196,63 +115,4 @@
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    // Create chart for milk distribution if data exists
-    {% if milk_type_distribution %}
-    document.addEventListener('DOMContentLoaded', function() {
-        const ctx = document.getElementById('milkDistributionChart').getContext('2d');
-        
-        // Extract data from the milk_type_distribution
-        const labels = [{% for item in milk_type_distribution %}'{{ item.name }}',{% endfor %}];
-        const quantities = [{% for item in milk_type_distribution %}{{ item.quantity }},{% endfor %}];
-        const amounts = [{% for item in milk_type_distribution %}{{ item.amount }},{% endfor %}];
-        
-        // Create a pie chart for quantity distribution
-        const milkDistributionChart = new Chart(ctx, {
-            type: 'pie',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: quantities,
-                    backgroundColor: [
-                        '#4CAF50',
-                        '#2196F3',
-                        '#FFC107',
-                        '#9C27B0',
-                        '#E91E63',
-                        '#FF5722'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                    },
-                    title: {
-                        display: true,
-                        text: '{% trans "Milk Quantity Distribution (Liters)" %}'
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const label = context.label || '';
-                                const value = context.raw || 0;
-                                const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
-                                const percentage = Math.round((value * 100) / total);
-                                return `${label}: ${value.toFixed(1)} {% trans "liters" %} (${percentage}%)`;
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    });
-    {% endif %}
-</script>
 {% endblock %}

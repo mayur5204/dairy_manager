@@ -42,7 +42,10 @@
                     </div>
                     
                     <div class="row">
-                        <div class="col-12">
+                        <div class="col-md-6">
+                            {{ form.area|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
                             {{ form.milk_types|as_crispy_field }}
                         </div>
                     </div>

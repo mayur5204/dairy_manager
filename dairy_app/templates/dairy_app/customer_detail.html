@@ -40,6 +40,15 @@
                     <dt class="col-sm-4">{% trans "Address" %}</dt>
                     <dd class="col-sm-8">{{ customer.address|default:_("Not provided")|linebreaksbr }}</dd>
                     
+                    <dt class="col-sm-4">{% trans "Area" %}</dt>
+                    <dd class="col-sm-8">
+                        {% if customer.area %}
+                        <span class="badge bg-info">{{ customer.area.name }}</span>
+                        {% else %}
+                        <span class="badge bg-light text-dark">{% trans "Not assigned" %}</span>
+                        {% endif %}
+                    </dd>
+                    
                     <dt class="col-sm-4">{% trans "Joined On" %}</dt>
                     <dd class="col-sm-8">{{ customer.date_joined|date:"d M, Y" }}</dd>
                     

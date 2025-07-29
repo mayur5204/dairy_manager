@@ -16,11 +16,11 @@
     </div>
 </div>
 
-<!-- Enhanced Search Bar -->
+<!-- Enhanced Search Bar with Area Filter -->
 <div class="card mb-4">
     <div class="card-body">
         <div class="row g-3 align-items-end">
-            <div class="col-md-10">
+            <div class="col-md-6">
                 <label for="searchInput" class="form-label"><i class="fas fa-search"></i> {% trans "Search Customer" %}</label>
                 <div class="input-group">
                     <span class="input-group-text"><i class="fas fa-search"></i></span>
@@ -32,6 +32,15 @@
                     </button>
                     {% endif %}
                 </div>
+            </div>
+            <div class="col-md-4">
+                <label for="areaFilter" class="form-label"><i class="fas fa-map-marker-alt"></i> {% trans "Filter by Area" %}</label>
+                <select id="areaFilter" class="form-select form-select-lg">
+                    <option value="">{% trans "All Areas" %}</option>
+                    {% for area in areas %}
+                    <option value="{{ area.id }}" {% if selected_area == area.id %}selected{% endif %}>{{ area.name }}</option>
+                    {% endfor %}
+                </select>
             </div>
             <div class="col-md-2">
                 <span id="searchSpinner" class="d-none">
@@ -161,15 +170,15 @@
         {% if is_paginated %}
         <div class="d-flex justify-content-center mt-4">
             <nav aria-label="Customer pagination">
-                <ul class="pagination">
+                <ul class="pagination pagination-ajax">
                     {% if page_obj.has_previous %}
                     <li class="page-item">
-                        <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}" aria-label="First">
+                        <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_area %}&area={{ selected_area }}{% endif %}" aria-label="First">
                             <span aria-hidden="true">&laquo;&laquo;</span>
                         </a>
                     </li>
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" aria-label="Previous">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_area %}&area={{ selected_area }}{% endif %}" aria-label="Previous">
                             <span aria-hidden="true">&laquo;</span>
                         </a>
                     </li>
@@ -180,19 +189,19 @@
                             <li class="page-item disabled"><span class="page-link">...</span></li>
                         {% else %}
                             <li class="page-item {% if page_obj.number == page_num %}active{% endif %}">
-                                <a class="page-link" href="?page={{ page_num }}{% if search_query %}&search={{ search_query }}{% endif %}">{{ page_num }}</a>
+                                <a class="page-link" href="?page={{ page_num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_area %}&area={{ selected_area }}{% endif %}">{{ page_num }}</a>
                             </li>
                         {% endif %}
                     {% endfor %}
                     
                     {% if page_obj.has_next %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" aria-label="Next">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_area %}&area={{ selected_area }}{% endif %}" aria-label="Next">
                             <span aria-hidden="true">&raquo;</span>
                         </a>
                     </li>
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}" aria-label="Last">
+                        <a class="page-link" href="?page={{ paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_area %}&area={{ selected_area }}{% endif %}" aria-label="Last">
                             <span aria-hidden="true">&raquo;&raquo;</span>
                         </a>
                     </li>
@@ -264,9 +273,16 @@ document.addEventListener('DOMContentLoaded', function() {
         searchSpinner.classList.remove('d-none');
         
         // Set the current URL with the search parameter to enable browser history
-        // But don't include the ajax_search parameter in the URL
         const currentUrl = new URL(window.location.href);
         currentUrl.searchParams.set('search', searchTerm);
+        
+        // Preserve area filter if it exists
+        const areaFilter = document.getElementById('areaFilter');
+        if (areaFilter && areaFilter.value) {
+            currentUrl.searchParams.set('area', areaFilter.value);
+        } else {
+            currentUrl.searchParams.delete('area');
+        }
         
         // Remove page parameter when searching to start from page 1
         currentUrl.searchParams.delete('page');
@@ -361,14 +377,21 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }, 300); // 300ms delay
     
-    // Initialize search based on URL parameters (important for back button navigation)
+    // Initialize search and area filter based on URL parameters (important for back button navigation)
     function initSearchFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
         const searchParam = urlParams.get('search');
+        const areaParam = urlParams.get('area');
         
+        // Initialize search if parameter exists
         if (searchParam) {
             searchInput.value = searchParam;
             performSearch(true);  // Force refresh to avoid caching issues
+        }
+        
+        // Initialize area filter if parameter exists
+        if (areaParam && areaFilter) {
+            areaFilter.value = areaParam;
         }
     }
     
@@ -382,17 +405,147 @@ document.addEventListener('DOMContentLoaded', function() {
         if (this.value.trim()) {
             performSearch(true);
         } else {
-            // If search input is cleared, reload the page to restore pagination
-            window.location.href = window.location.pathname;
+            // If search input is cleared, update the URL but keep area filter if present
+            const areaFilter = document.getElementById('areaFilter');
+            const areaValue = areaFilter ? areaFilter.value : '';
+            
+            let url = window.location.pathname;
+            if (areaValue) {
+                url += '?area=' + areaValue;
+            }
+            window.location.href = url;
         }
     });
+    
+    // Handle area filter changes asynchronously
+    const areaFilter = document.getElementById('areaFilter');
+    if (areaFilter) {
+        areaFilter.addEventListener('change', function() {
+            // Show spinner while filtering
+            searchSpinner.classList.remove('d-none');
+            
+            // Get the current search value
+            const searchValue = searchInput.value.trim();
+            
+            // Update URL for browser history without refreshing page
+            const currentUrl = new URL(window.location.href);
+            const searchParams = currentUrl.searchParams;
+            
+            if (this.value) {
+                searchParams.set('area', this.value);
+            } else {
+                searchParams.delete('area');
+            }
+            
+            if (searchValue) {
+                searchParams.set('search', searchValue);
+            } else {
+                searchParams.delete('search');
+            }
+            
+            // Reset to page 1 when filtering
+            searchParams.delete('page');
+            
+            // Update browser URL without reloading
+            history.pushState({}, '', currentUrl.toString());
+            
+            // Add ajax_search parameter for fetch request
+            const fetchUrl = new URL(currentUrl);
+            fetchUrl.searchParams.set('ajax_search', 'true');
+            
+            // Fetch results
+            fetch(fetchUrl.toString(), {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                cache: 'no-store'
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Hide spinner
+                searchSpinner.classList.add('d-none');
+                
+                // Hide pagination when showing filtered results
+                const paginationElements = document.querySelectorAll('.pagination, .text-center.text-muted.small');
+                paginationElements.forEach(el => {
+                    el.style.display = 'none';
+                });
+                
+                if (data.customers && data.customers.length > 0) {
+                    // We have results
+                    noResultsMessage.classList.add('d-none');
+                    customerTableBody.classList.remove('d-none');
+                    
+                    // Clear existing rows
+                    customerTableBody.innerHTML = '';
+                    
+                    // Add new rows
+                    data.customers.forEach(customer => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${customer.counter}</td>
+                            <td>
+                                <a href="/dairy/customers/${customer.id}/" class="text-decoration-none">
+                                    ${customer.highlighted_name || customer.name}
+                                </a>
+                            </td>
+                            <td>${customer.milk_types_html}</td>
+                            <td>${customer.delivery_html.replace(/bg-info text-dark/g, 'milk-delivery-badge').replace(/bg-light text-dark">No deliveries/g, 'milk-delivery-no-data">No deliveries')}</td>
+                            <td>${customer.balance_html}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="/dairy/sales/add/?customer=${customer.id}" class="btn btn-primary">
+                                        <i class="fas fa-plus-circle"></i> {% trans "Sale" %}
+                                    </a>
+                                    <a href="/dairy/payments/add/?customer=${customer.id}" class="btn btn-accent">
+                                        <i class="fas fa-money-bill"></i> {% trans "Payment" %}
+                                    </a>
+                                </div>
+                            </td>
+                        `;
+                        customerTableBody.appendChild(row);
+                    });
+                    
+                    // Show the total count of results
+                    const totalCountEl = document.createElement('div');
+                    totalCountEl.className = 'text-center text-muted small mt-3';
+                    totalCountEl.innerHTML = `{% trans "Showing all" %} ${data.total_count} {% trans "matching customers" %}`;
+                    const cardBody = customerTableBody.closest('.card-body');
+                    const existingTotalCount = cardBody.querySelector('.text-center.text-muted.small:not(.pagination + .text-center)');
+                    if (existingTotalCount) {
+                        existingTotalCount.remove();
+                    }
+                    cardBody.appendChild(totalCountEl);
+                    
+                } else {
+                    // No results
+                    customerTableBody.classList.add('d-none');
+                    noResultsMessage.classList.remove('d-none');
+                    searchQueryText.textContent = searchValue || 'area filter';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching filtered results:', error);
+                searchSpinner.classList.add('d-none');
+            });
+        });
+    }
     
     // Clear button functionality
     const clearSearchFunction = function(e) {
         if (e) e.preventDefault();
         searchInput.value = '';
+        
+        // Keep area filter if it's set
+        const areaFilter = document.getElementById('areaFilter');
+        let url = window.location.pathname;
+        
+        if (areaFilter && areaFilter.value) {
+            url += '?area=' + areaFilter.value;
+        }
+        
         // Do a full page reload to restore pagination instead of AJAX search
-        window.location.href = window.location.pathname;
+        window.location.href = url;
     };
     
     if (clearSearch) {
@@ -402,6 +555,76 @@ document.addEventListener('DOMContentLoaded', function() {
     if (clearSearchBtn) {
         clearSearchBtn.addEventListener('click', clearSearchFunction);
     }
+    
+    // Handle pagination with AJAX
+    document.addEventListener('click', function(e) {
+        // Check if clicked element is a pagination link
+        if (e.target.closest('.pagination-ajax a.page-link')) {
+            e.preventDefault();
+            
+            const link = e.target.closest('.pagination-ajax a.page-link');
+            const url = new URL(link.href);
+            
+            // Show spinner
+            searchSpinner.classList.remove('d-none');
+            
+            // Add AJAX parameter
+            url.searchParams.set('ajax_search', 'true');
+            
+            // Fetch page data
+            fetch(url.toString(), {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                cache: 'no-store'
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Hide spinner
+                searchSpinner.classList.add('d-none');
+                
+                if (data.customers && data.customers.length > 0) {
+                    // Update customer table with new data
+                    customerTableBody.innerHTML = '';
+                    
+                    data.customers.forEach(customer => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${customer.counter}</td>
+                            <td>
+                                <a href="/dairy/customers/${customer.id}/" class="text-decoration-none">
+                                    ${customer.highlighted_name || customer.name}
+                                </a>
+                            </td>
+                            <td>${customer.milk_types_html}</td>
+                            <td>${customer.delivery_html.replace(/bg-info text-dark/g, 'milk-delivery-badge').replace(/bg-light text-dark">No deliveries/g, 'milk-delivery-no-data">No deliveries')}</td>
+                            <td>${customer.balance_html}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="/dairy/sales/add/?customer=${customer.id}" class="btn btn-primary">
+                                        <i class="fas fa-plus-circle"></i> {% trans "Sale" %}
+                                    </a>
+                                    <a href="/dairy/payments/add/?customer=${customer.id}" class="btn btn-accent">
+                                        <i class="fas fa-money-bill"></i> {% trans "Payment" %}
+                                    </a>
+                                </div>
+                            </td>
+                        `;
+                        customerTableBody.appendChild(row);
+                    });
+                    
+                    // Update URL for browser history without reloading
+                    history.pushState({}, '', link.href);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching page:', error);
+                searchSpinner.classList.add('d-none');
+            });
+            
+            return false;
+        }
+    });
     
     // Run initial search if URL contains search parameter
     initSearchFromUrl();

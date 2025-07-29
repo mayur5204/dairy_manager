@@ -10,6 +10,13 @@ urlpatterns = [
     # Dashboard
     path('', views.dashboard_view, name='dashboard'),
     
+    # Area URLs
+    path('areas/', views.AreaListView.as_view(), name='area_list'),
+    path('areas/add/', views.AreaCreateView.as_view(), name='area_add'),
+    path('areas/<int:pk>/edit/', views.AreaUpdateView.as_view(), name='area_edit'),
+    path('areas/<int:pk>/delete/', views.AreaDeleteView.as_view(), name='area_delete'),
+    path('areas/<int:pk>/customers/', views.area_customers_view, name='area_customers'),
+    
     # Milk Type URLs
     path('milk-types/', views.MilkTypeListView.as_view(), name='milk_type_list'),
     path('milk-types/add/', views.MilkTypeCreateView.as_view(), name='milk_type_add'),

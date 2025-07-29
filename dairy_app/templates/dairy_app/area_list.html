@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Delivery Areas" %} | {% trans "Trimurti Dairy" %}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>{% trans "Delivery Areas" %}</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'area_add' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> {% trans "Add New Area" %}
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="row mb-3">
+        <div class="col">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">{% trans "Your Delivery Areas" %}</h5>
+        </div>
+        <div class="card-body">
+            {% if areas %}
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>{% trans "Area Name" %}</th>
+                            <th>{% trans "Description" %}</th>
+                            <th>{% trans "Customers" %}</th>
+                            <th>{% trans "Actions" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for area in areas %}
+                        <tr>
+                            <td>{{ area.name }}</td>
+                            <td>{{ area.description|default:"-" }}</td>
+                            <td>
+                                <a href="{% url 'area_customers' area.id %}" class="btn btn-sm btn-outline-primary">
+                                    {{ area.customer_count }} {% trans "customers" %}
+                                </a>
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'customer_list' %}?area={{ area.id }}" class="btn btn-sm btn-info">
+                                        <i class="fas fa-users"></i> {% trans "View Customers" %}
+                                    </a>
+                                    <a href="{% url 'area_edit' area.id %}" class="btn btn-sm btn-warning">
+                                        <i class="fas fa-edit"></i> {% trans "Edit" %}
+                                    </a>
+                                    <a href="{% url 'area_delete' area.id %}" class="btn btn-sm btn-danger">
+                                        <i class="fas fa-trash"></i> {% trans "Delete" %}
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                {% trans "You haven't created any delivery areas yet." %}
+                <a href="{% url 'area_add' %}" class="alert-link">{% trans "Add your first area" %}</a>.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

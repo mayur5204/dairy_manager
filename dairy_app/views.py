@@ -11,10 +11,11 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponseRedirect, JsonResponse, HttpResponse
 from django.utils.translation import gettext_lazy as _
 
-from .models import MilkType, Customer, Sale, Payment
+from .models import MilkType, Customer, Sale, Payment, Area
 from .forms import (
     MilkTypeForm, CustomerForm, SaleForm, 
-    SaleInputForm, PaymentForm, DateRangeForm, MonthSelectionForm
+    SaleInputForm, PaymentForm, DateRangeForm, MonthSelectionForm,
+    AreaForm
 )
 
 import re
@@ -27,66 +28,22 @@ from decimal import Decimal
 def dashboard_view(request):
     """Main dashboard view showing summary data"""
     today = timezone.now().date()
-    start_of_month = today.replace(day=1)
     
     # Get customers count
     customers_count = Customer.objects.all().count()
     
-    # Get today's sales
-    today_sales = Sale.objects.filter(date=today)
-    today_total_quantity = today_sales.aggregate(total=Sum('quantity'))['total'] or 0
-    today_total_amount = today_sales.aggregate(
-        total=Sum(F('quantity') * F('rate'), output_field=DecimalField())
-    )['total'] or 0
+    # Get areas count
+    areas_count = Area.objects.filter(user=request.user).count()
     
-    # Get month's sales
-    month_sales = Sale.objects.filter(
-        date__gte=start_of_month, 
-        date__lte=today
-    )
-    month_total_amount = month_sales.aggregate(
-        total=Sum(F('quantity') * F('rate'), output_field=DecimalField())
-    )['total'] or 0
-    
-    # Get month's payments
-    month_payments = Payment.objects.filter(
-        date__gte=start_of_month, 
-        date__lte=today
-    )
-    month_total_payment = month_payments.aggregate(total=Sum('amount'))['total'] or 0
-    
-    # Get recent sales
+    # Get recent activities
     recent_sales = Sale.objects.order_by('-created_at')[:5]  # Order by creation time
-    
-    # Get recent payments
     recent_payments = Payment.objects.order_by('-created_at')[:5] # Order by creation time
-    
-    # Get milk type distribution for today
-    milk_type_distribution = []
-    milk_types = MilkType.objects.filter(sales__date=today).distinct()
-    
-    for milk_type in milk_types:
-        type_sales = today_sales.filter(milk_type=milk_type)
-        quantity = type_sales.aggregate(total=Sum('quantity'))['total'] or 0
-        amount = type_sales.aggregate(
-            total=Sum(F('quantity') * F('rate'), output_field=DecimalField())
-        )['total'] or 0
-        
-        milk_type_distribution.append({
-            'name': milk_type.name,
-            'quantity': quantity,
-            'amount': amount
-        })
     
     context = {
         'customers_count': customers_count,
-        'today_total_quantity': today_total_quantity,
-        'today_total_amount': today_total_amount,
-        'month_total_amount': month_total_amount,
-        'month_total_payment': month_total_payment,
+        'areas_count': areas_count,
         'recent_sales': recent_sales,
         'recent_payments': recent_payments,
-        'milk_type_distribution': milk_type_distribution,
         'today': today,
     }
     
@@ -185,6 +142,91 @@ class MilkTypeDeleteView(LoginRequiredMixin, DeleteView):
         return super().delete(request, *args, **kwargs)
 
 
+# Area Views
+class AreaListView(LoginRequiredMixin, ListView):
+    model = Area
+    template_name = 'dairy_app/area_list.html'
+    context_object_name = 'areas'
+    
+    def get_queryset(self):
+        # Show areas for current user
+        return Area.objects.filter(user=self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Add customer counts for each area
+        for area in context['areas']:
+            area.customer_count = area.get_customer_count()
+        return context
+
+
+class AreaCreateView(LoginRequiredMixin, CreateView):
+    model = Area
+    form_class = AreaForm
+    template_name = 'dairy_app/area_form.html'
+    success_url = reverse_lazy('area_list')
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
+    def form_valid(self, form):
+        # Set the current user as the owner
+        form.instance.user = self.request.user
+        messages.success(self.request, f"Area '{form.instance.name}' created successfully!")
+        return super().form_valid(form)
+
+
+class AreaUpdateView(LoginRequiredMixin, UpdateView):
+    model = Area
+    form_class = AreaForm
+    template_name = 'dairy_app/area_form.html'
+    success_url = reverse_lazy('area_list')
+    
+    def get_queryset(self):
+        # Only allow users to edit their own areas
+        return Area.objects.filter(user=self.request.user)
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
+    def form_valid(self, form):
+        messages.success(self.request, f"Area '{form.instance.name}' updated successfully!")
+        return super().form_valid(form)
+
+
+class AreaDeleteView(LoginRequiredMixin, DeleteView):
+    model = Area
+    template_name = 'dairy_app/area_confirm_delete.html'
+    success_url = reverse_lazy('area_list')
+    
+    def get_queryset(self):
+        # Only allow users to delete their own areas
+        return Area.objects.filter(user=self.request.user)
+    
+    def delete(self, request, *args, **kwargs):
+        area = self.get_object()
+        messages.success(request, f"Area '{area.name}' deleted successfully!")
+        return super().delete(request, *args, **kwargs)
+
+
+@login_required
+def area_customers_view(request, pk):
+    """View customers for a specific area"""
+    area = get_object_or_404(Area, pk=pk, user=request.user)
+    customers = Customer.objects.filter(area=area)
+    
+    context = {
+        'area': area,
+        'customers': customers
+    }
+    
+    return render(request, 'dairy_app/area_customers.html', context)
+
+
 # Customer Views
 class CustomerListView(LoginRequiredMixin, ListView):
     model = Customer
@@ -226,8 +268,17 @@ class CustomerListView(LoginRequiredMixin, ListView):
     
     def get_queryset(self):
         queryset = Customer.objects.all()
-        search_query = self.request.GET.get('search', '').strip()
         
+        # Filter by area if specified
+        area_id = self.request.GET.get('area')
+        if area_id:
+            try:
+                queryset = queryset.filter(area_id=area_id)
+            except ValueError:
+                pass
+                
+        # Filter by search term
+        search_query = self.request.GET.get('search', '').strip()
         if search_query:
             # More comprehensive search across name field
             queryset = queryset.filter(name__icontains=search_query)
@@ -298,6 +349,18 @@ class CustomerListView(LoginRequiredMixin, ListView):
         if search_query:
             for customer in context['customers']:
                 customer.highlighted_name = self.highlight_text(customer.name, search_query)
+        
+        # Add areas for filtering
+        areas = Area.objects.filter(user=self.request.user)
+        context['areas'] = areas
+        
+        # Check if an area filter is active
+        area_id = self.request.GET.get('area')
+        if area_id:
+            try:
+                context['selected_area'] = int(area_id)
+            except ValueError:
+                pass
         
         # Add custom pagination information
         page_obj = context['page_obj']
@@ -574,6 +637,11 @@ class CustomerCreateView(LoginRequiredMixin, CreateView):
     template_name = 'dairy_app/customer_form.html'
     success_url = reverse_lazy('customer_list')
     
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
     def form_valid(self, form):
         # Use the first admin user as default owner for all records
         first_user = User.objects.filter(is_superuser=True).first() or self.request.user
@@ -587,6 +655,11 @@ class CustomerUpdateView(LoginRequiredMixin, UpdateView):
     form_class = CustomerForm
     template_name = 'dairy_app/customer_form.html'
     
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+        
     def get_queryset(self):
         # Return all customers
         return Customer.objects.all()
@@ -696,7 +769,7 @@ def sale_create_view(request):
     # Handle search query
     search_query = request.GET.get('search', '').strip()
     if search_query:
-        search_results = Customer.objects.filter(name__icontains(search_query))
+        search_results = Customer.objects.filter(name__icontains=search_query)
     
     # Handle customer selection
     customer_id = request.GET.get('customer')
@@ -876,7 +949,7 @@ def payment_create_view(request):
     # Handle search query
     search_query = request.GET.get('search', '').strip()
     if search_query:
-        search_results = Customer.objects.filter(name__icontains(search_query))
+        search_results = Customer.objects.filter(name__icontains=search_query)
     
     # Handle customer selection
     customer_id = request.GET.get('customer')
@@ -1603,3 +1676,4 @@ def download_customer_data(request):
     # Save workbook to response
     wb.save(response)
     return response
+

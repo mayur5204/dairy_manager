@@ -1,9 +1,31 @@
 from django import forms
 from django.contrib.auth.models import User
-from .models import MilkType, Customer, Sale, Payment
+from .models import MilkType, Customer, Sale, Payment, Area
 from django.core.exceptions import ValidationError
 import datetime
 
+
+class AreaForm(forms.ModelForm):
+    """Form for creating and updating delivery areas."""
+    class Meta:
+        model = Area
+        fields = ['name', 'description']
+    
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        # Ensure labels can be translated
+        from django.utils.translation import gettext_lazy as _
+        self.fields['name'].label = _('Area Name*')
+        self.fields['description'].label = _('Description')
+        
+    def save(self, commit=True):
+        area = super().save(commit=False)
+        if self.user and not area.pk:  # Only set user on new area creation
+            area.user = self.user
+        if commit:
+            area.save()
+        return area
 
 class MilkTypeForm(forms.ModelForm):
     """Form for creating and updating milk types."""
@@ -34,18 +56,25 @@ class CustomerForm(forms.ModelForm):
     """Form for creating and updating customers."""
     class Meta:
         model = Customer
-        fields = ['name', 'address', 'phone', 'milk_types']
+        fields = ['name', 'address', 'phone', 'area', 'milk_types']
         widgets = {
             'milk_types': forms.CheckboxSelectMultiple(),
         }
     
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
+        
+        # Only show areas created by this user
+        if self.user:
+            self.fields['area'].queryset = Area.objects.filter(user=self.user)
+        
         # Ensure labels can be translated
         from django.utils.translation import gettext_lazy as _
         self.fields['name'].label = _('Name*')
         self.fields['address'].label = _('Address')
         self.fields['phone'].label = _('Phone')
+        self.fields['area'].label = _('Delivery Area')
         self.fields['milk_types'].label = _('Milk Types*')
 
 

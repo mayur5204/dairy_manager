@@ -4,6 +4,22 @@ from django.utils import timezone
 from django.db.models import Sum, F
 from django.utils.translation import gettext_lazy as _
 
+class Area(models.Model):
+    """Model representing a delivery area or zone."""
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='areas')
+    
+    class Meta:
+        ordering = ['name']
+    
+    def __str__(self):
+        return self.name
+    
+    def get_customer_count(self):
+        """Return the number of customers in this area."""
+        return self.customers.count()
+
 class MilkType(models.Model):
     """Model representing different types of milk (e.g., Cow, Buffalo)."""
     name = models.CharField(max_length=100)
@@ -24,6 +40,7 @@ class Customer(models.Model):
     address = models.TextField(blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True, null=True)
     milk_types = models.ManyToManyField(MilkType, related_name='customers')
+    area = models.ForeignKey(Area, on_delete=models.SET_NULL, null=True, blank=True, related_name='customers')
     date_joined = models.DateTimeField(auto_now_add=True)
     
     class Meta:
