@@ -1,0 +1,55 @@
+{% load i18n %}
+<div id="unpaid-months-content">
+{% if form.unpaid_months %}
+<div class="table-responsive">
+    <table class="table table-sm table-hover">
+        <thead>
+            <tr>
+                <th>{% trans "Select" %}</th>
+                <th>{% trans "Month" %}</th>
+                <th>{% trans "Sales Amount" %}</th>
+                <th>{% trans "Paid Amount" %}</th>
+                <th>{% trans "Remaining" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for month in form.unpaid_months %}
+            <tr>
+                <td>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="selected_months" value="{{ month.month }}_{{ month.year }}" id="month-{{ month.month }}-{{ month.year }}">
+                    </div>
+                </td>
+                <td>{{ month.month_name }} {{ month.year }}</td>
+                <td>₹{{ month.sales_amount|floatformat:2 }}</td>
+                <td>₹{{ month.payment_amount|floatformat:2 }}</td>
+                <td>₹{{ month.remaining|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div class="d-flex justify-content-between mt-2">
+        <div>
+            <button type="button" class="btn btn-sm btn-secondary" id="select-all-months">{% trans "Select All" %}</button>
+            <button type="button" class="btn btn-sm btn-secondary ms-2" id="deselect-all-months">{% trans "Deselect All" %}</button>
+        </div>
+        <div>
+            <button type="button" class="btn btn-sm btn-primary refresh-unpaid-months" data-customer-id="{{ customer.id }}">
+                <i class="fas fa-sync-alt"></i> {% trans "Refresh Months" %}
+            </button>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-secondary">
+    {% if customer %}
+        {% trans "No unpaid months found for this customer. All months have been paid or no sales records exist yet." %}
+        <button type="button" class="btn btn-sm btn-outline-primary ms-2 refresh-unpaid-months" data-customer-id="{{ customer.id }}">
+            <i class="fas fa-sync-alt"></i> {% trans "Check Again" %}
+        </button>
+    {% else %}
+        {% trans "No unpaid months found. Please select a customer first." %}
+    {% endif %}
+</div>
+{% endif %}
+</div>

@@ -50,4 +50,7 @@ urlpatterns = [
     path('reports/monthly/', views.monthly_report_view, name='monthly_report'),
     path('reports/customer-export/', views.customer_export_view, name='customer_export'),
     path('reports/customer-export/download/', views.download_customer_data, name='download_customer_data'),
+    
+    # Bill Generation URLs
+    path('customers/<int:pk>/bill/', views.generate_customer_bill, name='generate_customer_bill'),
 ]

@@ -11,7 +11,21 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponseRedirect, JsonResponse, HttpResponse
 from django.utils.translation import gettext_lazy as _
 
-from .models import MilkType, Customer, Sale, Payment, Area
+# Import ReportLab for PDF generation
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4, letter
+from reportlab.lib.units import cm, inch, mm
+from reportlab.lib import colors
+from reportlab.platypus import Table, TableStyle
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from io import BytesIO
+import os
+import tempfile
+from PyPDF2 import PdfReader, PdfWriter
+from django.conf import settings
+
+from .models import MilkType, Customer, Sale, Payment, Area, MonthlyBalance
 from .forms import (
     MilkTypeForm, CustomerForm, SaleForm, 
     SaleInputForm, PaymentForm, DateRangeForm, MonthSelectionForm,
@@ -522,6 +536,16 @@ class CustomerDetailView(LoginRequiredMixin, DetailView):
         # Calculate balance
         context['balance'] = customer.get_balance()
         
+        # Add current month and year for bill generation
+        today = timezone.now().date()
+        context['current_month'] = today.month
+        context['current_month_name'] = today.strftime('%B')
+        context['current_year'] = today.year
+        
+        # Import translation functions for month names
+        from django.utils.translation import gettext_lazy as _
+        from django.utils.dates import MONTHS
+        
         # Get selected month and year for monthly consumption
         today = timezone.now().date()
         selected_month = self.request.GET.get('month', today.month)
@@ -604,10 +628,6 @@ class CustomerDetailView(LoginRequiredMixin, DetailView):
             if milk_type.name not in milk_type_totals:
                 milk_type_totals[milk_type.name] = Decimal('0.0')
         
-        # Import translation functions
-        from django.utils.translation import gettext_lazy as _
-        from django.utils.dates import MONTHS
-        
         # Add context variables
         context['monthly_consumption'] = monthly_consumption
         context['milk_type_totals'] = milk_type_totals
@@ -615,6 +635,38 @@ class CustomerDetailView(LoginRequiredMixin, DetailView):
         context['selected_month'] = selected_month
         context['selected_year'] = selected_year
         context['milk_types'] = milk_types
+        
+        # Get monthly balance information
+        # First, update the monthly balances for this customer to ensure they're current
+        customer.get_monthly_balances(update=True)
+        
+        # Get monthly balance for the selected month
+        month_balance_info = customer.get_month_balance(selected_year, selected_month)
+        context['month_balance_info'] = month_balance_info
+        
+        # Get pending months (months with unpaid balances)
+        context['pending_months'] = customer.get_pending_months()
+        
+        # Get all monthly balances
+        context['monthly_balances'] = MonthlyBalance.objects.filter(
+            customer=customer
+        ).order_by('-year', '-month')[:12]  # Show last 12 months
+        
+        # Get payment allocations for each month
+        from django.db.models import Prefetch
+        try:
+            from .models import PaymentAllocation
+            context['has_allocations'] = True
+            
+            # Get all payment allocations for this customer
+            allocations = PaymentAllocation.objects.filter(
+                payment__customer=customer
+            ).select_related('payment').order_by('-payment__date')[:20]
+            
+            context['payment_allocations'] = allocations
+        except ImportError:
+            # PaymentAllocation model may not be available yet (during migrations)
+            context['has_allocations'] = False
         
         # Use translated month name instead of strftime
         context['month_name'] = _(MONTHS[selected_month])
@@ -953,11 +1005,29 @@ def payment_create_view(request):
     
     # Handle customer selection
     customer_id = request.GET.get('customer')
+    fetch_unpaid = request.GET.get('fetch_unpaid') == 'true'
+    
     if customer_id:
         try:
             customer = Customer.objects.get(id=customer_id)
             form = PaymentForm(initial={'customer': customer})
+            
+            # Always fetch unpaid months for the selected customer to ensure they're available
+            # Force recalculation first for accurate data
+            MonthlyBalance.update_monthly_balances(customer)
+            form.unpaid_months = form.get_unpaid_months(customer)
+            
+            # For AJAX requests, we can return just the unpaid months section
+            if fetch_unpaid and 'HTTP_X_REQUESTED_WITH' in request.META:
+                # Render the partial template with just the unpaid months
+                return render(request, 'dairy_app/payment_form_partial.html', {
+                    'form': form,
+                    'customer': customer
+                })
+                
         except Customer.DoesNotExist:
+            form = PaymentForm()
+        except Exception as e:
             form = PaymentForm()
     else:
         form = PaymentForm()
@@ -969,7 +1039,76 @@ def payment_create_view(request):
             # Use the first admin user as default owner for all records
             first_user = User.objects.filter(is_superuser=True).first() or request.user
             payment.user = first_user
+            
+            # Check if this is a multi-month payment
+            is_multi_month = form.cleaned_data.get('is_multi_month')
+            
+            # If using multi-month distribution, make sure payment_for_month/year are None
+            if is_multi_month:
+                payment.payment_for_month = None
+                payment.payment_for_year = None
+                
             payment.save()
+            
+            if is_multi_month and 'selected_months' in request.POST:
+                # Process multiple month allocation
+                selected_month_strings = request.POST.getlist('selected_months')
+                
+                # Parse the selected months from format "month_year"
+                selected_months = []
+                for month_str in selected_month_strings:
+                    try:
+                        month, year = month_str.split('_')
+                        selected_months.append((int(month), int(year)))
+                    except (ValueError, IndexError):
+                        # Skip invalid formats
+                        continue
+                
+                # Get all selected unpaid months
+                unpaid_months = []
+                amount_remaining = payment.amount
+                
+                # Get the customer's unpaid months
+                unpaid_balances = MonthlyBalance.objects.filter(
+                    customer=payment.customer,
+                    is_paid=False,
+                    sales_amount__gt=0
+                ).order_by('year', 'month')  # Process oldest months first
+                
+                # Create allocations
+                allocations = []
+                for balance in unpaid_balances:
+                    if (balance.month, balance.year) not in selected_months:
+                        continue
+                    
+                    # Calculate how much to allocate to this month
+                    owed_amount = balance.sales_amount - balance.payment_amount
+                    allocation_amount = min(owed_amount, amount_remaining)
+                    
+                    if allocation_amount <= 0:
+                        continue
+                    
+                    # Create allocation for this month
+                    allocations.append({
+                        'month': balance.month,
+                        'year': balance.year,
+                        'amount': allocation_amount
+                    })
+                    
+                    amount_remaining -= allocation_amount
+                    
+                    # Stop if we've allocated all the payment
+                    if amount_remaining <= 0:
+                        break
+                
+                # Distribute payment across selected months
+                if allocations:
+                    payment.distribute_to_months(allocations)
+                    
+                    # Force recalculation of all monthly balances for this customer
+                    # This ensures all allocations are properly accounted for
+                    MonthlyBalance.update_monthly_balances(payment.customer)
+            
             messages.success(request, "Payment recorded successfully!")
             
             # If coming from customer detail page, redirect back there
@@ -1004,8 +1143,15 @@ class PaymentUpdateView(LoginRequiredMixin, UpdateView):
         return context
     
     def form_valid(self, form):
+        response = super().form_valid(form)
+        
+        # Force recalculation of all monthly balances for this customer 
+        # after saving the payment to ensure accurate balances
+        customer = self.object.customer
+        MonthlyBalance.update_monthly_balances(customer)
+        
         messages.success(self.request, "Payment updated successfully!")
-        return super().form_valid(form)
+        return response
 
 
 class PaymentDeleteView(LoginRequiredMixin, DeleteView):
@@ -1018,8 +1164,18 @@ class PaymentDeleteView(LoginRequiredMixin, DeleteView):
         return Payment.objects.all()
     
     def delete(self, request, *args, **kwargs):
+        # Get the customer before deleting the payment
+        payment = self.get_object()
+        customer = payment.customer
+        
+        # Delete the payment
+        response = super().delete(request, *args, **kwargs)
+        
+        # Update the monthly balances for this customer
+        MonthlyBalance.update_monthly_balances(customer)
+        
         messages.success(request, "Payment deleted successfully!")
-        return super().delete(request, *args, **kwargs)
+        return response
 
 
 # Report Views
@@ -1667,6 +1823,394 @@ def download_customer_data(request):
             ws.col(i).width = 256 * 15  # 15 characters wide
     
     # Create response with correct MIME type for Excel files
+
+@login_required
+def generate_customer_bill(request, pk):
+    """Generate a PDF bill for a specific customer using a template PDF"""
+    import os
+    from django.conf import settings
+    from PyPDF2 import PdfReader, PdfWriter
+    from reportlab.lib.units import inch, cm
+    from reportlab.pdfgen import canvas
+    
+    customer = get_object_or_404(Customer, pk=pk)
+    
+    # Get the month and year parameters, default to current month if not provided
+    today = timezone.now().date()
+    month = int(request.GET.get('month', today.month))
+    year = int(request.GET.get('year', today.year))
+    
+    # Get the start and end date for the selected month
+    start_date = datetime.date(year, month, 1)
+    # Find the last day of month
+    if month == 12:
+        end_date = datetime.date(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        end_date = datetime.date(year, month + 1, 1) - timedelta(days=1)
+    
+    # Get sales for this customer in the selected month
+    sales = Sale.objects.filter(
+        customer=customer,
+        date__gte=start_date,
+        date__lte=end_date
+    ).order_by('date', 'milk_type__name')
+    
+    # Get payments for this customer in the selected month
+    payments = Payment.objects.filter(
+        customer=customer,
+        date__gte=start_date,
+        date__lte=end_date
+    ).order_by('date')
+    
+    # Calculate totals
+    total_amount = sales.aggregate(
+        total=Sum(F('quantity') * F('rate'), output_field=DecimalField())
+    )['total'] or Decimal('0')
+    
+    total_payment = payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    
+    # Calculate previous balance (before this month)
+    previous_sales = Sale.objects.filter(
+        customer=customer,
+        date__lt=start_date
+    ).aggregate(
+        total=Sum(F('quantity') * F('rate'), output_field=DecimalField())
+    )['total'] or Decimal('0')
+    
+    previous_payments = Payment.objects.filter(
+        customer=customer,
+        date__lt=start_date
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    
+    previous_balance = previous_sales - previous_payments
+    
+    # Calculate current balance
+    current_balance = previous_balance + total_amount - total_payment
+    
+    # Group sales by milk type
+    milk_type_summary = {}
+    for sale in sales:
+        milk_type_name = sale.milk_type.name
+        if milk_type_name not in milk_type_summary:
+            milk_type_summary[milk_type_name] = {
+                'quantity': Decimal('0'),
+                'amount': Decimal('0'),
+                'rate': sale.rate
+            }
+        milk_type_summary[milk_type_name]['quantity'] += sale.quantity
+        milk_type_summary[milk_type_name]['amount'] += sale.quantity * sale.rate
+    
+    # Path to the PDF template - using the provided template
+    template_path = os.path.join(settings.BASE_DIR, 'Dairy_bill1.pdf')
+    
+    # Check if template exists
+    if not os.path.exists(template_path):
+        # If template doesn't exist, return an error
+        messages.error(request, "Bill template not found. Please ensure 'Dairy_bill1.pdf' is in the project root directory.")
+        return redirect('customer_detail', pk=pk)
+    
+    # Create a buffer for our data layer
+    data_buffer = BytesIO()
+    
+    # Register Devanagari font - make sure this font exists in your system
+    # Let's check for different possible font locations and use a fallback mechanism
+    font_paths = [
+        os.path.join(settings.BASE_DIR, 'static', 'fonts', 'NotoSansDevanagari-VariableFont_wdth,wght.ttf'),
+        os.path.join(settings.BASE_DIR, 'fonts', 'NotoSansDevanagari-VariableFont_wdth,wght.ttf'),
+        # Add fallback fonts that support Devanagari
+        'Arial Unicode MS',
+        'NotoSansDevanagari-Regular',
+        'Mangal',
+    ]
+    
+    # Try to register a Devanagari-compatible font
+    devanagari_font_registered = False
+    for font_path in font_paths:
+        try:
+            # For file paths
+            if os.path.exists(font_path):
+                pdfmetrics.registerFont(TTFont('DevanagariFont', font_path))
+                devanagari_font_registered = True
+                break
+            # For system fonts (just try to register by name)
+            elif not os.path.sep in font_path:
+                try:
+                    pdfmetrics.registerFont(TTFont('DevanagariFont', font_path))
+                    devanagari_font_registered = True
+                    break
+                except:
+                    pass
+        except:
+            continue
+    
+    # Create a PDF to add data on
+    c = canvas.Canvas(data_buffer, pagesize=A4)
+    width, height = A4  # A4 size in points
+    
+    # Get month name and translate it
+    from django.utils.dates import MONTHS
+    month_name = str(_(MONTHS[month]))
+    
+    # Adjust coordinates to match your provided template (Dairy Bill.pdf)
+    # These coordinates may need adjustment based on the exact layout of your template
+    
+    # Customer Information Section
+    # Use Devanagari font if registered, otherwise fallback to Helvetica
+    font_name = "DevanagariFont" if devanagari_font_registered else "Helvetica-Bold"
+    
+    c.setFont(font_name, 15)
+    c.drawString(2.3*cm, height-7.75*cm, f"{customer.name}")
+    
+    # Add month and year
+    c.setFont(font_name, 15)
+    c.drawString(width-7.5*cm, height-7.75*cm, f"{month_name}")
+    
+    c.setFont(font_name, 15)
+    c.drawString(width-3.7*cm, height-7.75*cm, f"{year}")
+
+    # Adjust these coordinates to match your provided template (Dairy Bill.pdf)
+    # Table headers
+    y_position = height - 12.5*cm
+    table_left = 2.9*cm
+    
+  
+    
+    # Add milk consumption data
+    y_position -= 1.5*cm
+    c.setFont(font_name if devanagari_font_registered else "Helvetica", 12)
+    
+    # Maximum rows we can fit in the table area
+    max_rows = 5
+    row_count = 0
+    
+    for milk_type, details in milk_type_summary.items():
+        if row_count >= max_rows:
+            break  # Don't overflow the template
+            
+        # Use the milk_type name directly without translation
+        c.drawString(table_left, y_position, milk_type)
+        c.drawString(table_left + 5.3*cm, y_position, f"{details['rate']:.2f}")
+        c.drawString(table_left + 9.1*cm, y_position, f"{details['quantity']:.2f}")
+        c.drawString(table_left + 13.9*cm, y_position, f"{details['amount']:.2f}")
+        
+        y_position -= 1.6*cm
+        row_count += 1
+    
+    # Add total line at the bottom of the table
+    if milk_type_summary:  # Only if there are items
+        c.setFont(font_name if devanagari_font_registered else "Helvetica-Bold", 13)
+        c.drawString(table_left, height-18.6*cm, str(_("Total")))
+        c.drawString(table_left + 9.1*cm, height-18.6*cm, 
+                    f"{sum(item['quantity'] for item in milk_type_summary.values()):.2f}")
+        c.drawString(table_left + 13.9*cm, height-18.6*cm, f"{total_amount:.2f}")
+    
+    # Payment summary section
+    payment_y = height - 20.3*cm
+    payment_left = 1.5*cm
+    payment_value_left = width - 4.25*cm
+    
+    c.setFont(font_name if devanagari_font_registered else "Helvetica", 13)
+    c.drawString(payment_left, payment_y, f"{str(_('Previous Balance'))}")
+    c.drawString(payment_value_left, payment_y, f"{previous_balance:.2f}")
+    payment_y -= 1.5*cm
+    
+    c.drawString(payment_left, payment_y, f"{str(_('Current Month Total'))}")
+    c.drawString(payment_value_left, payment_y, f"{total_amount:.2f}")
+    payment_y -= 1.5*cm
+    
+    c.drawString(payment_left, payment_y, f"{str(_('Payments Received'))}")
+    c.drawString(payment_value_left, payment_y, f"{total_payment:.2f}")
+    
+    # Final balance
+    balance_y = height - 25*cm
+    c.setFont(font_name if devanagari_font_registered else "Helvetica-Bold", 13)
+    c.drawString(payment_left, balance_y, str(_("Balance Due:")))
+    c.drawString(payment_value_left, balance_y, f"{current_balance:.2f}")
+
+
+    
+    # Add generation info
+    c.setFont(font_name if devanagari_font_registered else "Helvetica", 8)
+    c.drawRightString(width-2*cm, 0.5*cm, f"{str(_('Generated on'))}: {timezone.now().strftime('%d/%m/%Y %H:%M')}")
+    
+    # Save the data layer PDF
+    c.save()
+    
+    # Get the value of the BytesIO buffer
+    data_buffer.seek(0)
+    
+    # Create a new PDF with PdfWriter
+    output_buffer = BytesIO()
+    
+    # Read the template PDF
+    template_pdf = PdfReader(open(template_path, "rb"))
+    output_pdf = PdfWriter()
+    
+    # Read the data layer PDF
+    data_pdf = PdfReader(data_buffer)
+    
+    # Get both pages from template PDF (assuming it has 2 pages)
+    template_page1 = template_pdf.pages[0]
+    template_page2 = template_pdf.pages[1] if len(template_pdf.pages) > 1 else None
+    data_page = data_pdf.pages[0]
+    
+    # Merge the data onto the first template page
+    template_page1.merge_page(data_page)
+    
+    # Add the merged first page to the output PDF
+    output_pdf.add_page(template_page1)
+    
+    # Create a data layer for the second page with day-wise milk distribution table
+    second_page_buffer = BytesIO()
+    p2 = canvas.Canvas(second_page_buffer, pagesize=A4)
+    p2_width, p2_height = A4  # A4 size in points
+    
+
+    
+    # Add customer name, month and year
+    p2.setFont(font_name if devanagari_font_registered else "Helvetica-Bold", 14)
+    p2.drawString(2*cm, p2_height-3.5*cm, f"{str(_('Customer'))}: {customer.name}")
+    p2.drawString(2*cm, p2_height-4.5*cm, f"{str(_('Month'))}: {month_name} {year}")
+    
+    # Calculate days in the selected month
+    days_in_month = (end_date - start_date).days + 1
+    
+    # Create day-wise data structure for milk deliveries
+    daily_milk_data = {}
+    
+    # Populate the daily data from sales
+    for sale in sales:
+        day = sale.date.day
+        if day not in daily_milk_data:
+            daily_milk_data[day] = {}
+        
+        milk_type_name = sale.milk_type.name
+        if milk_type_name not in daily_milk_data[day]:
+            daily_milk_data[day][milk_type_name] = 0
+            
+        daily_milk_data[day][milk_type_name] += sale.quantity
+    
+    # Get unique milk types from sales
+    unique_milk_types = set()
+    for day_data in daily_milk_data.values():
+        for milk_type in day_data.keys():
+            unique_milk_types.add(milk_type)
+    unique_milk_types = sorted(list(unique_milk_types))
+    
+    # Draw the table
+    table_top = p2_height - 6*cm
+    table_left = 2*cm
+    row_height = 0.8*cm
+    col_width = 1.5*cm
+    date_col_width = 2*cm
+    milk_type_col_width = 3*cm
+    
+    # Calculate table dimensions based on content
+    table_width = date_col_width + len(unique_milk_types) * col_width
+    
+    # Draw table header
+    p2.setFont(font_name if devanagari_font_registered else "Helvetica-Bold", 12)
+    p2.drawString(table_left, table_top, str(_("Day")))
+    
+    # Draw milk type column headers
+    milk_type_x = table_left + date_col_width
+    for milk_type in unique_milk_types:
+        p2.drawString(milk_type_x, table_top, milk_type)
+        milk_type_x += col_width
+    
+    # Draw horizontal line below header
+    p2.line(table_left, table_top - 0.3*cm, table_left + table_width, table_top - 0.3*cm)
+    
+    # Set up for 2-column layout with fixed 15 days per column
+    # Define column offsets
+    column_offset = p2_width / 2  # Divide the page in half
+    
+    # First column will always have 15 days, second column the remainder
+    days_in_first_column = 15
+    
+    # Draw the day rows
+    column = 0
+    page = 1
+    row_y = table_top - row_height
+    
+    # Draw headers for both columns at the start
+    for col in range(2):
+        col_left = table_left + col * column_offset
+        
+        p2.setFont(font_name if devanagari_font_registered else "Helvetica-Bold", 12)
+        p2.drawString(col_left, table_top, str(_("Day")))
+        
+        milk_type_x = col_left + date_col_width
+        for milk_type in unique_milk_types:
+            p2.drawString(milk_type_x, table_top, milk_type)
+            milk_type_x += col_width
+        
+        p2.line(col_left, table_top - 0.3*cm, col_left + table_width, table_top - 0.3*cm)
+    
+    for day in range(1, days_in_month + 1):
+        # Determine which column this day belongs to
+        if day <= days_in_first_column:
+            column = 0
+            # Maintain vertical position relative to the first day in column
+            row_y = table_top - row_height - ((day - 1) * row_height)
+        else:
+            column = 1
+            # Maintain vertical position relative to the first day in column
+            row_y = table_top - row_height - ((day - days_in_first_column - 1) * row_height)
+            
+        # Calculate current column's left position
+        current_left = table_left + column * column_offset
+        
+        # Draw day number
+        p2.setFont(font_name if devanagari_font_registered else "Helvetica", 12)
+        p2.drawString(current_left, row_y, str(day))
+        
+        # Draw milk quantities for each type
+        milk_type_x = current_left + date_col_width
+        for milk_type in unique_milk_types:
+            quantity = 0
+            if day in daily_milk_data and milk_type in daily_milk_data[day]:
+                quantity = daily_milk_data[day][milk_type]
+            
+            if quantity > 0:
+                p2.drawString(milk_type_x, row_y, f"{quantity:.2f}")
+            milk_type_x += col_width
+        
+        row_y -= row_height
+    
+    
+    # Save the second page data layer
+    p2.save()
+    second_page_buffer.seek(0)
+    
+    # Read the second page data layer
+    second_page_pdf = PdfReader(second_page_buffer)
+    second_page_data = second_page_pdf.pages[0]
+    
+    # If template has a second page, merge with it, otherwise add the new page directly
+    if template_page2:
+        template_page2.merge_page(second_page_data)
+        output_pdf.add_page(template_page2)
+    else:
+        output_pdf.add_page(second_page_data)
+    
+    # Write the output PDF to the buffer
+    output_pdf.write(output_buffer)
+    output_buffer.seek(0)
+    
+    # Create the HttpResponse object with PDF content
+    response = HttpResponse(content_type='application/pdf')
+    file_name = f"Bill_{customer.name}_{month_name}_{year}.pdf".replace(" ", "_")
+    response['Content-Disposition'] = f'attachment; filename="{file_name}"'
+    
+    # Write the merged PDF to the response
+    response.write(output_buffer.getvalue())
+    
+    # Clean up buffers
+    data_buffer.close()
+    output_buffer.close()
+    
+    return response
     response = HttpResponse(content_type='application/vnd.ms-excel')
     
     # Set the Content-Disposition header with proper filename and extension

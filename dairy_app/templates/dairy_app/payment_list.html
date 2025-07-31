@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load i18n %}
+{% load dict_filters %}
 
 {% block title %}{% trans "Payments - Dairy Manager" %}{% endblock %}
 
@@ -25,6 +26,7 @@
                         <th>{% trans "Date" %}</th>
                         <th>{% trans "Customer" %}</th>
                         <th>{% trans "Amount" %} (₹)</th>
+                        <th>{% trans "Payment For" %}</th>
                         <th>{% trans "Description" %}</th>
                         <th>{% trans "Actions" %}</th>
                     </tr>
@@ -39,6 +41,17 @@
                             </a>
                         </td>
                         <td>{{ payment.amount|floatformat:2 }}</td>
+                        <td>
+                            {% if payment.payment_for_month and payment.payment_for_year %}
+                                <span class="badge bg-info">
+                                    {% with month_name=payment.payment_for_month|month_name %}
+                                    {{ month_name }} {{ payment.payment_for_year }}
+                                    {% endwith %}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">{% trans "Not specified" %}</span>
+                            {% endif %}
+                        </td>
                         <td>{{ payment.description|default:"--"|truncatechars:50 }}</td>
                         <td>
                             <div class="btn-group btn-group-sm">

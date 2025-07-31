@@ -1,0 +1,134 @@
+# Hindi translations for Dairy Manager application
+# Copyright (C) 2025 Dairy Manager Team
+# This file is distributed under the same license as the Dairy Manager package.
+# Mayur Raj <mayur@example.com>, 2025.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-04-18 16:30+0530\n"
+"PO-Revision-Date: 2025-07-29 10:45+0530\n"
+"Last-Translator: Mayur Raj <mayur@example.com>\n"
+"Language-Team: Hindi <hi@li.org>\n"
+"Language: hi\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+# Navigation and Sidebar
+msgid "Dashboard"
+msgstr "डैशबोर्ड"
+
+msgid "Delivery Areas" 
+msgstr "वितरण क्षेत्र"
+
+msgid "Manage areas"
+msgstr "क्षेत्र प्रबंधित करें"
+
+# Area related strings
+msgid "Add New Area"
+msgstr "नया क्षेत्र जोड़ें"
+
+msgid "Your Delivery Areas"
+msgstr "आपके वितरण क्षेत्र"
+
+msgid "Area Name"
+msgstr "क्षेत्र का नाम"
+
+msgid "Customers"
+msgstr "ग्राहक"
+
+msgid "customers"
+msgstr "ग्राहक"
+
+msgid "Actions"
+msgstr "कार्य"
+
+msgid "View Customers"
+msgstr "ग्राहकों को देखें"
+
+msgid "Edit"
+msgstr "संपादित करें"
+
+msgid "Delete"
+msgstr "हटाएं"
+
+msgid "You haven't created any delivery areas yet."
+msgstr "आपने अभी तक कोई वितरण क्षेत्र नहीं बनाया है।"
+
+msgid "Add your first area"
+msgstr "अपना पहला क्षेत्र जोड़ें"
+
+msgid "Edit Area"
+msgstr "क्षेत्र संपादित करें"
+
+msgid "Add Area"
+msgstr "क्षेत्र जोड़ें"
+
+msgid "Area Details"
+msgstr "क्षेत्र का विवरण"
+
+msgid "Save Area"
+msgstr "क्षेत्र सहेजें"
+
+msgid "Cancel"
+msgstr "रद्द करें"
+
+msgid "Delete Area"
+msgstr "क्षेत्र हटाएं"
+
+msgid "Confirm Delete"
+msgstr "हटाने की पुष्टि करें"
+
+msgid "Are you sure you want to delete this area?"
+msgstr "क्या आप वाकई इस क्षेत्र को हटाना चाहते हैं?"
+
+msgid "Name:"
+msgstr "नाम:"
+
+msgid "Warning!"
+msgstr "चेतावनी!"
+
+msgid "This area contains"
+msgstr "इस क्षेत्र में"
+
+msgid "customer(s)."
+msgstr "ग्राहक हैं।"
+
+msgid "If you delete this area, those customers will no longer be assigned to any area."
+msgstr "अगर आप यह क्षेत्र हटाते हैं, तो वे ग्राहक किसी भी क्षेत्र से संबद्ध नहीं रहेंगे।"
+
+msgid "Delete Permanently"
+msgstr "स्थायी रूप से हटाएं"
+
+msgid "Area Customers"
+msgstr "क्षेत्र के ग्राहक"
+
+msgid "Customers in"
+msgstr "ग्राहक"
+
+msgid "Add Customer to This Area"
+msgstr "इस क्षेत्र में ग्राहक जोड़ें"
+
+msgid "Back to Areas"
+msgstr "क्षेत्रों पर वापस जाएँ"
+
+msgid "Name"
+msgstr "नाम"
+
+msgid "Phone"
+msgstr "फोन"
+
+msgid "Address"
+msgstr "पता"
+
+msgid "View"
+msgstr "देखें"
+
+msgid "No customers are assigned to this area yet."
+msgstr "इस क्षेत्र को अभी तक कोई ग्राहक नहीं सौंपा गया है।"
+
+msgid "Add a customer to this area"
+msgstr "इस क्षेत्र में एक ग्राहक जोड़ें"

@@ -1,7 +1,8 @@
 from django import forms
 from django.contrib.auth.models import User
-from .models import MilkType, Customer, Sale, Payment, Area
+from .models import MilkType, Customer, Sale, Payment, Area, MonthlyBalance
 from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 import datetime
 
 
@@ -161,12 +162,24 @@ class SaleInputForm(forms.Form):
 
 class PaymentForm(forms.ModelForm):
     """Form for recording payments from customers."""
+    is_multi_month = forms.BooleanField(
+        required=False, 
+        label=_("Distribute across multiple months"),
+        help_text=_("Enable to distribute this payment across multiple unpaid months")
+    )
+    
     class Meta:
         model = Payment
-        fields = ['customer', 'date', 'amount', 'description']
+        fields = ['customer', 'date', 'amount', 'payment_for_month', 'payment_for_year', 'description']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
             'amount': forms.NumberInput(attrs={'min': '0', 'step': '0.01'}),
+            'payment_for_month': forms.Select(choices=[
+                (i, datetime.date(2000, i, 1).strftime('%B')) for i in range(1, 13)
+            ]),
+            'payment_for_year': forms.Select(choices=[
+                (y, y) for y in range(datetime.datetime.now().year - 5, datetime.datetime.now().year + 1)
+            ]),
         }
     
     def clean_amount(self):
@@ -174,6 +187,17 @@ class PaymentForm(forms.ModelForm):
         if amount <= 0:
             raise ValidationError("Amount must be greater than zero.")
         return amount
+        
+    def clean(self):
+        """Ensure payment_for_month/year fields are handled correctly with multi-month allocation."""
+        cleaned_data = super().clean()
+        
+        # If multi-month is selected, set payment_for_month/year to None to avoid confusion
+        if cleaned_data.get('is_multi_month'):
+            cleaned_data['payment_for_month'] = None
+            cleaned_data['payment_for_year'] = None
+            
+        return cleaned_data
     
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)  # Keep for backward compatibility but don't use it
@@ -182,11 +206,72 @@ class PaymentForm(forms.ModelForm):
         self.fields['customer'].queryset = Customer.objects.all()
         
         # Ensure labels can be translated
-        from django.utils.translation import gettext_lazy as _
         self.fields['date'].label = _('Date*')
         self.fields['amount'].label = _('Amount*')
         self.fields['description'].label = _('Description')
         self.fields['customer'].label = _('Customer')
+        self.fields['payment_for_month'].label = _('Payment for Month')
+        self.fields['payment_for_year'].label = _('Payment for Year')
+        
+        # Default to current month and year if creating a new payment
+        # and not using multi-month mode
+        if not self.instance.pk:
+            # Check if multi-month is set in POST data
+            is_multi_month = False
+            if self.data and 'is_multi_month' in self.data:
+                is_multi_month = self.data.get('is_multi_month') == 'on'
+                
+            if not is_multi_month:
+                self.fields['payment_for_month'].initial = datetime.datetime.now().month
+                self.fields['payment_for_year'].initial = datetime.datetime.now().year
+        
+        # Helpful text
+        self.fields['payment_for_month'].help_text = _('Select which month this payment applies to')
+        self.fields['payment_for_year'].help_text = _('Select which year this payment applies to')
+        
+        # Store unpaid months for the selected customer
+        self.unpaid_months = []
+        if 'customer' in self.data:
+            try:
+                customer_id = int(self.data.get('customer'))
+                customer = Customer.objects.get(id=customer_id)
+                self.unpaid_months = self.get_unpaid_months(customer)
+            except (ValueError, Customer.DoesNotExist):
+                pass
+        elif self.instance.pk:
+            self.unpaid_months = self.get_unpaid_months(self.instance.customer)
+    
+    def get_unpaid_months(self, customer):
+        """Get a list of unpaid months for the customer."""
+        from django.db.models import F
+        
+        # Get all monthly balances that are not paid
+        # Force recalculation first to ensure we have the latest data
+        MonthlyBalance.update_monthly_balances(customer)
+        
+        unpaid_balances = MonthlyBalance.objects.filter(
+            customer=customer,
+            is_paid=False,
+            sales_amount__gt=0
+        ).order_by('-year', '-month')
+        
+        # Calculate remaining amount for each month
+        result = []
+        for balance in unpaid_balances:
+            month_data = {
+                'month': balance.month,
+                'year': balance.year,
+                'sales_amount': balance.sales_amount,
+                'payment_amount': balance.payment_amount,
+                'remaining': balance.sales_amount - balance.payment_amount,
+            }
+            
+            from calendar import month_name
+            month_data['month_name'] = month_name[balance.month]
+            
+            result.append(month_data)
+            
+        return result
 
 
 class DateRangeForm(forms.Form):

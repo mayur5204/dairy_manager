@@ -37,7 +37,6 @@
                     <thead class="table-light">
                         <tr>
                             <th>{% trans "Area Name" %}</th>
-                            <th>{% trans "Description" %}</th>
                             <th>{% trans "Customers" %}</th>
                             <th>{% trans "Actions" %}</th>
                         </tr>
@@ -46,7 +45,6 @@
                         {% for area in areas %}
                         <tr>
                             <td>{{ area.name }}</td>
-                            <td>{{ area.description|default:"-" }}</td>
                             <td>
                                 <a href="{% url 'area_customers' area.id %}" class="btn btn-sm btn-outline-primary">
                                     {{ area.customer_count }} {% trans "customers" %}

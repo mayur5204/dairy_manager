@@ -19,7 +19,31 @@ def enumerate_list(value):
     """
     Returns a list of pairs (index, item) for each item in the list
     """
-    return [(i, item) for i, item in enumerate(value)]
+    return enumerate(value)
+
+@register.filter(name='sub')
+def subtract(value, arg):
+    """
+    Subtract the arg from the value.
+    """
+    try:
+        return value - arg
+    except (ValueError, TypeError):
+        return value
+
+@register.filter(name='month_name')
+def get_month_name(month_number):
+    """
+    Return the name of the month for the given month number (1-12)
+    """
+    from calendar import month_name
+    try:
+        month = int(month_number)
+        if 1 <= month <= 12:
+            return month_name[month]
+        return ""
+    except (ValueError, TypeError):
+        return ""
 
 @register.filter
 def sum_attr(obj_list, attr_name):

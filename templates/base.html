@@ -293,7 +293,7 @@
                             <li>
                                 <form action="{% url 'set_language' %}" method="post" class="d-inline">
                                     {% csrf_token %}
-                                    <input name="next" type="hidden" value="{{ request.path|slice:'3:' }}">
+                                    <input name="next" type="hidden" value="{{ request.path }}">
                                     <input name="language" type="hidden" value="{{ language.code }}">
                                     <button type="submit" class="dropdown-item {% if language.code == LANGUAGE_CODE %}active{% endif %}">
                                         {% if language.code == 'en' %}
