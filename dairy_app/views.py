@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db.models import Sum, F, DecimalField
-from django.db.models.functions import TruncDay, TruncMonth
+from django.db.models.functions import TruncDay
 from django.utils import timezone
 from django.contrib import messages
 from django.urls import reverse_lazy
@@ -40,7 +40,7 @@ from django.conf import settings
 from .models import MilkType, Customer, Sale, Payment, Area, MonthlyBalance
 from .forms import (
     MilkTypeForm, CustomerForm, SaleForm, 
-    SaleInputForm, PaymentForm, DateRangeForm, MonthSelectionForm,
+    SaleInputForm, PaymentForm,
     AreaForm
 )
 
@@ -64,15 +64,9 @@ def dashboard_view(request):
     else:
         areas_count = Area.objects.filter(user=request.user).count()
     
-    # Get recent activities
-    recent_sales = Sale.objects.order_by('-created_at')[:5]  # Order by creation time
-    recent_payments = Payment.objects.order_by('-created_at')[:5] # Order by creation time
-    
     context = {
         'customers_count': customers_count,
         'areas_count': areas_count,
-        'recent_sales': recent_sales,
-        'recent_payments': recent_payments,
         'today': today,
     }
     
@@ -87,8 +81,8 @@ def search_customers(request):
     results = []
     
     if search_query:
-        # Search for customers by name, ordered by creation time for milk distribution route
-        customers = Customer.objects.filter(name__icontains=search_query).order_by('date_joined')[:10]  # Limit to 10 results
+        # Search for customers by name, ordered by delivery order within area, then creation time for milk distribution route
+        customers = Customer.objects.filter(name__icontains=search_query).order_by('area', 'delivery_order', 'date_joined')[:10]  # Limit to 10 results
         
         # Format results with highlighting
         for idx, customer in enumerate(customers):
@@ -256,7 +250,9 @@ def area_customers_view(request, pk):
         area = get_object_or_404(Area, pk=pk)
     else:
         area = get_object_or_404(Area, pk=pk, user=request.user)
-    customers = Customer.objects.filter(area=area).order_by('date_joined')  # Sort by creation time for milk distribution route
+    
+    # Order by delivery_order, then by date_joined for new customers without order
+    customers = Customer.objects.filter(area=area).order_by('delivery_order', 'date_joined')
     
     context = {
         'area': area,
@@ -264,6 +260,37 @@ def area_customers_view(request, pk):
     }
     
     return render(request, 'dairy_app/area_customers.html', context)
+
+
+@login_required
+def update_customer_order(request):
+    """AJAX view to update customer delivery order"""
+    if request.method == 'POST':
+        try:
+            import json
+            data = json.loads(request.body)
+            customer_ids = data.get('customer_ids', [])
+            area_id = data.get('area_id')
+            
+            # Verify area ownership for non-superusers
+            if not request.user.is_superuser:
+                area = get_object_or_404(Area, pk=area_id, user=request.user)
+            else:
+                area = get_object_or_404(Area, pk=area_id)
+            
+            # Update delivery order for each customer
+            for index, customer_id in enumerate(customer_ids):
+                Customer.objects.filter(
+                    id=customer_id, 
+                    area=area
+                ).update(delivery_order=index + 1)
+            
+            return JsonResponse({'success': True, 'message': 'Customer order updated successfully'})
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 
 # Customer Views
@@ -324,69 +351,18 @@ class CustomerListView(LoginRequiredMixin, ListView):
             # More comprehensive search across name field
             queryset = queryset.filter(name__icontains=search_query)
         
-        # Order by creation time when filtering by area (for milk distribution route),
+        # Order by delivery order within area when filtering by area (for milk distribution route),
         # otherwise order by name for general browsing
         if area_filtered:
-            return queryset.order_by('date_joined')  # Milk distribution route order
+            return queryset.order_by('delivery_order', 'date_joined')  # Milk distribution route order
         else:
             return queryset.order_by('name')  # Alphabetical for general browsing
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Get current month data
+        # Get current date
         today = timezone.now().date()
-        start_of_month = today.replace(day=1)
-        
-        customer_data = {}
-        
-        # Get all milk types for labeling
-        all_milk_types = MilkType.objects.all()
-        
-        # Get all customer IDs from the current page
-        customer_ids = [customer.id for customer in context['customers']]
-        
-        # Get the monthly milk delivery data for just the customers on this page
-        monthly_sales = Sale.objects.filter(
-            customer_id__in=customer_ids,
-            date__gte=start_of_month,
-            date__lte=today
-        ).values('customer_id', 'milk_type__name').annotate(
-            total_quantity=Sum('quantity')
-        )
-        
-        # Organize sales by customer
-        milk_delivery_by_customer = {}
-        for sale in monthly_sales:
-            customer_id = sale['customer_id']
-            milk_type_name = sale['milk_type__name']
-            quantity = sale['total_quantity']
-            
-            if customer_id not in milk_delivery_by_customer:
-                milk_delivery_by_customer[customer_id] = {}
-            
-            milk_delivery_by_customer[customer_id][milk_type_name] = quantity
-        
-        # Get balance data for customers on current page
-        for customer in context['customers']:
-            # Get milk delivery data (already calculated)
-            milk_delivery = milk_delivery_by_customer.get(customer.id, {})
-            
-            # Calculate balance
-            total_sales = Sale.objects.filter(customer=customer).aggregate(
-                total=Sum(F('quantity') * F('rate'), output_field=DecimalField())
-            )['total'] or 0
-            
-            total_payments = Payment.objects.filter(customer=customer).aggregate(
-                total=Sum('amount')
-            )['total'] or 0
-            
-            balance = total_sales - total_payments
-            
-            customer_data[customer.id] = {
-                'milk_delivery': milk_delivery,
-                'balance': balance
-            }
         
         # Get search query for highlighting
         search_query = self.request.GET.get('search', '').strip()
@@ -419,8 +395,6 @@ class CustomerListView(LoginRequiredMixin, ListView):
         page_range = list(paginator.get_elided_page_range(page_obj.number, on_each_side=2, on_ends=1))
         
         context.update({
-            'customer_data': customer_data,
-            'milk_types': all_milk_types,
             'search_query': search_query,
             'current_month': today.strftime('%B %Y'),
             'page_range': page_range,
@@ -440,63 +414,6 @@ class CustomerListView(LoginRequiredMixin, ListView):
             queryset = self.get_queryset()
             search_query = request.GET.get('search', '').strip()
             
-            # Calculate the data we need for display
-            today = timezone.now().date()
-            start_of_month = today.replace(day=1)
-            customer_data = {}
-            
-            # Get all matching customer IDs
-            customer_ids = list(queryset.values_list('id', flat=True))
-            
-            # Get the monthly milk delivery data in bulk
-            monthly_sales = Sale.objects.filter(
-                customer_id__in=customer_ids,
-                date__gte=start_of_month,
-                date__lte=today
-            ).values('customer_id', 'milk_type__name').annotate(
-                total_quantity=Sum('quantity')
-            )
-            
-            # Organize sales by customer
-            milk_delivery_by_customer = {}
-            for sale in monthly_sales:
-                customer_id = sale['customer_id']
-                milk_type_name = sale['milk_type__name']
-                quantity = sale['total_quantity']
-                
-                if customer_id not in milk_delivery_by_customer:
-                    milk_delivery_by_customer[customer_id] = {}
-                
-                milk_delivery_by_customer[customer_id][milk_type_name] = quantity
-            
-            # Get balance data for all matching customers in bulk
-            sales_by_customer = Sale.objects.filter(
-                customer_id__in=customer_ids
-            ).values('customer_id').annotate(
-                total=Sum(F('quantity') * F('rate'), output_field=DecimalField())
-            )
-            
-            payments_by_customer = Payment.objects.filter(
-                customer_id__in=customer_ids
-            ).values('customer_id').annotate(
-                total=Sum('amount')
-            )
-            
-            # Convert to dictionaries for faster lookup
-            sales_dict = {item['customer_id']: item['total'] for item in sales_by_customer}
-            payments_dict = {item['customer_id']: item['total'] for item in payments_by_customer}
-            
-            # Calculate balance for each customer
-            for customer_id in customer_ids:
-                total_sales = sales_dict.get(customer_id, 0) or 0
-                total_payments = payments_dict.get(customer_id, 0) or 0
-                balance = total_sales - total_payments
-                
-                customer_data[customer_id] = {
-                    'milk_delivery': milk_delivery_by_customer.get(customer_id, {}),
-                    'balance': balance
-                }
-            
             # Format the response
             html_content = []
             
@@ -509,19 +426,6 @@ class CustomerListView(LoginRequiredMixin, ListView):
                 else:
                     milk_types_html = '<span class="badge bg-light text-dark">None</span>'
                 
-                # Format milk delivery
-                delivery_html = ""
-                if customer.id in customer_data and customer_data[customer.id]['milk_delivery']:
-                    for milk_type_name, quantity in customer_data[customer.id]['milk_delivery'].items():
-                        delivery_html += f'<span class="badge bg-info text-dark">{milk_type_name}: {quantity:.1f} L</span> '
-                else:
-                    delivery_html = '<span class="badge bg-light text-dark">No deliveries</span>'
-                
-                # Format balance
-                balance = customer_data[customer.id]['balance']
-                balance_class = "bg-success" if balance > 0 else "bg-danger" if balance < 0 else "bg-light text-dark"
-                balance_html = f'<span class="badge {balance_class} fs-6">₹{balance:.2f}</span>'
-                
                 # Highlight the customer name if there's a search query
                 customer_name = customer.name
                 highlighted_name = self.highlight_text(customer_name, search_query) if search_query else customer_name
@@ -532,9 +436,7 @@ class CustomerListView(LoginRequiredMixin, ListView):
                     'id': customer.id,
                     'name': customer_name,
                     'highlighted_name': highlighted_name,
-                    'milk_types_html': milk_types_html,
-                    'delivery_html': delivery_html,
-                    'balance_html': balance_html
+                    'milk_types_html': milk_types_html
                 }
                 
                 html_content.append(row)
@@ -723,7 +625,7 @@ class CustomerDetailView(LoginRequiredMixin, DetailView):
             # Get customers in the same area, ordered by creation time (milk distribution route order)
             area_customers = Customer.objects.filter(
                 area=customer.area
-            ).order_by('date_joined')
+            ).order_by('delivery_order', 'date_joined')
             
             # Convert to list to find current customer's position
             customer_list = list(area_customers)
@@ -758,7 +660,7 @@ class CustomerDetailView(LoginRequiredMixin, DetailView):
             # If customer has no area, get all customers without area ordered by creation time
             no_area_customers = Customer.objects.filter(
                 area__isnull=True
-            ).order_by('date_joined')
+            ).order_by('delivery_order', 'date_joined')
             
             customer_list = list(no_area_customers)
             
@@ -983,23 +885,16 @@ def sale_create_view(request):
     referer = request.META.get('HTTP_REFERER', '')
     from_customer_page = '/customers/' in referer
     
-    # If no customer selected and not from customer page, redirect to customer list with search
-    if not request.GET.get('customer') and not from_customer_page:
-        return redirect('customer_list')
-    
-    # Handle search query
-    search_query = request.GET.get('search', '').strip()
-    if search_query:
-        search_results = Customer.objects.filter(name__icontains=search_query).order_by('date_joined')  # Order by route sequence
-    
     # Handle customer selection
     customer_id = request.GET.get('customer')
     last_sale_quantities = {}
     
+    # If customer ID is provided, get the customer
     if customer_id:
         try:
             customer = Customer.objects.get(id=customer_id)
             customer_milk_types = customer.milk_types.all()
+            from_customer_page = True  # Always treat as from customer page when customer is specified
             
             # Get the last sale quantity for each milk type for this customer
             for milk_type in customer_milk_types:
@@ -1011,11 +906,20 @@ def sale_create_view(request):
                 if last_sale:
                     last_sale_quantities[milk_type.id] = last_sale.quantity
             
-            form = SaleForm(initial={'customer': customer})
+            form = SaleForm(initial={'customer': customer}, customer_fixed=True)
         except Customer.DoesNotExist:
             form = SaleForm()
     else:
+        # If no customer specified, redirect to customer list to select one
+        if not request.GET.get('search'):
+            return redirect('customer_list')
         form = SaleForm()
+    
+    # Handle search query (only if no customer is already selected)
+    if not customer:
+        search_query = request.GET.get('search', '').strip()
+        if search_query:
+            search_results = Customer.objects.filter(name__icontains=search_query).order_by('area', 'delivery_order', 'date_joined')
 
     if request.method == 'POST':
         # Check if we're handling batch input
@@ -1072,7 +976,8 @@ def sale_create_view(request):
                 messages.error(request, "Invalid customer selected")
         else:
             # Handle regular single sale form
-            form = SaleForm(request.POST)
+            customer_fixed = customer is not None
+            form = SaleForm(request.POST, customer_fixed=customer_fixed)
             if form.is_valid():
                 sale = form.save(commit=False)
                 # Use the first admin user as default owner for all records
@@ -1085,7 +990,12 @@ def sale_create_view(request):
                 sale.notes = ''
                 sale.save()
                 messages.success(request, "Sale recorded successfully!")
-                return redirect('sale_list')
+                
+                # Redirect back to customer detail if coming from customer page
+                if customer:
+                    return redirect('customer_detail', pk=customer.id)
+                else:
+                    return redirect('sale_list')
     
     context = {
         'form': form,
@@ -1188,7 +1098,7 @@ def payment_create_view(request):
     if customer_id:
         try:
             customer = Customer.objects.get(id=customer_id)
-            form = PaymentForm(initial={'customer': customer})
+            form = PaymentForm(initial={'customer': customer}, customer_fixed=from_customer_page)
             
             # Always fetch unpaid months for the selected customer to ensure they're available
             # Force recalculation first for accurate data
@@ -1211,7 +1121,7 @@ def payment_create_view(request):
         form = PaymentForm()
 
     if request.method == 'POST':
-        form = PaymentForm(request.POST)
+        form = PaymentForm(request.POST, customer_fixed=customer is not None)
         if form.is_valid():
             payment = form.save(commit=False)
             # Use the first admin user as default owner for all records
@@ -1646,191 +1556,21 @@ class PaymentDeleteView(LoginRequiredMixin, DeleteView):
 
 # Report Views
 @login_required
-def daily_report_view(request):
-    """View for displaying daily sales summary"""
-    today = timezone.now().date()
-    
-    if request.method == 'POST':
-        form = DateRangeForm(request.POST)
-        if form.is_valid():
-            start_date = form.cleaned_data['start_date']
-            end_date = form.cleaned_data['end_date']
-        else:
-            start_date = today - timedelta(days=30)
-            end_date = today
-    else:
-        form = DateRangeForm(initial={'start_date': today - timedelta(days=30), 'end_date': today})
-        start_date = today - timedelta(days=30)
-        end_date = today
-    
-    # Get daily sales data - removed user filter
-    daily_sales = Sale.objects.filter(
-        date__gte=start_date, 
-        date__lte=end_date
-    ).values('date', 'milk_type__name').annotate(
-        total_quantity=Sum('quantity'),
-        total_amount=Sum(F('quantity') * F('rate'), output_field=DecimalField())
-    ).order_by('date')
-    
-    # Organize the data by date
-    report_data = {}
-    for sale in daily_sales:
-        date_str = sale['date'].strftime('%Y-%m-%d')
-        if date_str not in report_data:
-            report_data[date_str] = {
-                'date': sale['date'],
-                'milk_types': {},
-                'total_quantity': 0,
-                'total_amount': 0,
-            }
-        
-        report_data[date_str]['milk_types'][sale['milk_type__name']] = {
-            'quantity': sale['total_quantity'],
-            'amount': sale['total_amount']
-        }
-        
-        report_data[date_str]['total_quantity'] += sale['total_quantity']
-        report_data[date_str]['total_amount'] += sale['total_amount']
-    
-    # Convert to a list sorted by date
-    report_list = [report_data[date_str] for date_str in sorted(report_data.keys(), reverse=True)]
-    
-    # Calculate total quantities and amounts for the entire period
-    total_quantity = sum(day_data['total_quantity'] for day_data in report_list)
-    total_amount = sum(day_data['total_amount'] for day_data in report_list)
-    
-    context = {
-        'form': form,
-        'report_data': report_list,
-        'start_date': start_date,
-        'end_date': end_date,
-        'total_quantity': total_quantity,
-        'total_amount': total_amount,
-    }
-    
-    return render(request, 'dairy_app/daily_report.html', context)
-
-
-@login_required
-def monthly_report_view(request):
-    """View for displaying monthly sales summary"""
-    today = timezone.now().date()
-    
-    if request.method == 'POST':
-        form = MonthSelectionForm(request.POST)
-        if form.is_valid():
-            selected_month = int(form.cleaned_data['month'])
-            selected_year = int(form.cleaned_data['year'])
-        else:
-            # Default to current month and year
-            selected_month = today.month
-            selected_year = today.year
-    else:
-        # Default to current month and year
-        form = MonthSelectionForm(initial={
-            'month': today.month,
-            'year': today.year
-        })
-        selected_month = today.month
-        selected_year = today.year
-    
-    # Generate start and end dates for the selected month
-    start_date = datetime.date(selected_year, selected_month, 1)
-    if selected_month == 12:
-        end_date = datetime.date(selected_year + 1, 1, 1) - datetime.timedelta(days=1)
-    else:
-        end_date = datetime.date(selected_year, selected_month + 1, 1) - datetime.timedelta(days=1)
-    
-    # Get monthly sales data
-    monthly_sales = Sale.objects.filter(
-        date__gte=start_date,
-        date__lte=end_date
-    ).annotate(
-        month=TruncMonth('date')
-    ).values('month').annotate(
-        total_quantity=Sum('quantity'),
-        total_amount=Sum(F('quantity') * F('rate'), output_field=DecimalField())
-    ).order_by('month')
-    
-    # Get monthly payment data
-    monthly_payments = Payment.objects.filter(
-        date__gte=start_date,
-        date__lte=end_date
-    ).annotate(
-        month=TruncMonth('date')
-    ).values('month').annotate(
-        total_amount=Sum('amount')
-    ).order_by('month')
-    
-    # Organize the data
-    report_data = {}
-    for sale in monthly_sales:
-        month_str = sale['month'].strftime('%Y-%m')
-        if month_str not in report_data:
-            report_data[month_str] = {
-                'month': sale['month'],
-                'total_quantity': sale['total_quantity'],
-                'total_amount': sale['total_amount'],
-                'total_payment': 0,
-                'balance': 0,
-            }
-        else:
-            report_data[month_str]['total_quantity'] += sale['total_quantity']
-            report_data[month_str]['total_amount'] += sale['total_amount']
-    
-    for payment in monthly_payments:
-        month_str = payment['month'].strftime('%Y-%m')
-        if month_str in report_data:
-            report_data[month_str]['total_payment'] += payment['total_amount']
-        else:
-            report_data[month_str] = {
-                'month': payment['month'],
-                'total_quantity': 0,
-                'total_amount': 0,
-                'total_payment': payment['total_amount'],
-                'balance': 0,
-            }
-    
-    # Calculate balance for each month
-    for month_str, data in report_data.items():
-        data['balance'] = data['total_amount'] - data['total_payment']
-    
-    # Convert to a list
-    report_list = [report_data[month_str] for month_str in sorted(report_data.keys())]
-    
-    # Calculate totals for the entire period
-    total_quantity = sum(month_data['total_quantity'] for month_data in report_list)
-    total_sales = sum(month_data['total_amount'] for month_data in report_list)
-    total_payments = sum(month_data['total_payment'] for month_data in report_list)
-    total_balance = total_sales - total_payments
-    
-    context = {
-        'form': form,
-        'report_data': report_list,
-        'month_name': start_date.strftime('%B'),
-        'year': selected_year,
-        'total_quantity': total_quantity,
-        'total_sales': total_sales,
-        'total_payments': total_payments,
-        'total_balance': total_balance,
-    }
-    
-    return render(request, 'dairy_app/monthly_report.html', context)
-
-
 @login_required
 def customer_export_view(request):
-    """View for displaying customer data export page with month/year selection"""
+    """View for displaying customer data export page with month/year and area selection"""
     # Get current date
     today = timezone.now().date()
     
-    # Handle month/year selection
+    # Handle month/year/area selection
     if request.method == 'POST':
         selected_month = int(request.POST.get('month', today.month))
         selected_year = int(request.POST.get('year', today.year))
+        selected_area = request.POST.get('area', '')
     else:
         selected_month = int(request.GET.get('month', today.month))
         selected_year = int(request.GET.get('year', today.year))
+        selected_area = request.GET.get('area', '')
     
     # Validate month and year
     if not 1 <= selected_month <= 12:
@@ -1849,8 +1589,11 @@ def customer_export_view(request):
     day_range = range(1, days_in_month + 1)
     preview_days = min(7, days_in_month)  # Show only 7 days in preview
     
-    # For better performance, limit to top 25 customers for web view
-    customers = Customer.objects.all().order_by('name')[:25]
+    # Filter customers by area if specified, limit to top 25 for web view
+    customers = Customer.objects.all().order_by('name')
+    if selected_area:
+        customers = customers.filter(area_id=selected_area)
+    customers = customers[:25]
     
     # Pre-fetch all sales data for these customers in one query
     customer_ids = [customer.id for customer in customers]
@@ -2009,13 +1752,18 @@ def customer_export_view(request):
     current_year = today.year
     year_options = range(current_year - 2, current_year + 1)
     
+    # Get all areas for the dropdown
+    areas = Area.objects.all().order_by('name')
+    
     context = {
         'customers_data': customers_data,
         'selected_month': selected_month,
         'selected_year': selected_year,
+        'selected_area': selected_area,
         'month_name': start_date.strftime('%B'),
         'month_options': month_options,
         'year_options': year_options,
+        'areas': areas,
         'day_range': day_range,
         'days_in_month': days_in_month,
         'preview_days': preview_days
@@ -2026,7 +1774,7 @@ def customer_export_view(request):
 
 @login_required
 def download_customer_data(request):
-    """View for downloading customer data as Excel"""
+    """View for downloading customer data as Excel with area filtering"""
     from django.utils.translation import gettext as _
     from django.utils.translation import get_language
     from django.utils.dates import MONTHS
@@ -2034,6 +1782,7 @@ def download_customer_data(request):
     # Get parameters
     selected_month = int(request.GET.get('month', timezone.now().month))
     selected_year = int(request.GET.get('year', timezone.now().year))
+    selected_area = request.GET.get('area', '')  # Add area filter
     
     # Validate month and year
     today = timezone.now().date()
@@ -2051,12 +1800,22 @@ def download_customer_data(request):
     
     days_in_month = end_date.day
     
-    # Get all customers
+    # Get customers filtered by area if specified
     customers = Customer.objects.all().order_by('name')
+    if selected_area:
+        customers = customers.filter(area_id=selected_area)
     
-    # Create filename with translated month name
+    # Create filename with translated month name and area
     month_name = _(start_date.strftime('%B'))
-    filename = f"customer_data_{month_name}_{selected_year}"
+    area_suffix = ""
+    if selected_area:
+        try:
+            area = Area.objects.get(id=selected_area)
+            area_suffix = f"_{area.name}"
+        except Area.DoesNotExist:
+            pass
+    
+    filename = f"customer_data_{month_name}_{selected_year}{area_suffix}"
     
     # Check if xlwt is available
     try:
@@ -2111,6 +1870,7 @@ def download_customer_data(request):
     
     # Translate column headers
     customer_header = _('Customer')
+    area_header = _('Area')
     milk_type_header = _('Milk Type')
     total_liters_header = _('Total (L)')
     total_amount_header = _('Total Amount (₹)')
@@ -2120,6 +1880,8 @@ def download_customer_data(request):
     # Write headers
     col_idx = 0
     ws.write(0, col_idx, customer_header, header_style)
+    col_idx += 1
+    ws.write(0, col_idx, area_header, header_style)
     col_idx += 1
     ws.write(0, col_idx, milk_type_header, header_style)
     col_idx += 1
@@ -2182,6 +1944,9 @@ def download_customer_data(request):
             col_idx = 0
             ws.write(row_idx, col_idx, customer.name, customer_style)
             col_idx += 1
+            # Write area
+            ws.write(row_idx, col_idx, customer.area.name if customer.area else "-", cell_style)
+            col_idx += 1
             ws.write(row_idx, col_idx, "-", cell_style)
             col_idx += 1
             
@@ -2214,13 +1979,17 @@ def download_customer_data(request):
         if customer_rows_count == 0:
             customer_rows_count = 1
         
-        # If this customer has multiple milk types, merge cells for customer name, balance and overall total first
+        # If this customer has multiple milk types, merge cells for customer name, area, balance and overall total first
         if customer_rows_count > 1:
             # Merge customer name column
             ws.write_merge(first_row_for_customer, first_row_for_customer + customer_rows_count - 1, 0, 0, customer.name, customer_style)
             
+            # Merge area column
+            area_name = customer.area.name if customer.area else "-"
+            ws.write_merge(first_row_for_customer, first_row_for_customer + customer_rows_count - 1, 1, 1, area_name, customer_style)
+            
             # Calculate column indices for balance and overall total
-            balance_col = 2 + days_in_month + 2  # Customer, Milk Type, Days columns, Total L, Total Amount
+            balance_col = 3 + days_in_month + 2  # Customer, Area, Milk Type, Days columns, Total L, Total Amount
             overall_total_col = balance_col + 1
             
             # Merge balance and overall total columns
@@ -2231,8 +2000,9 @@ def download_customer_data(request):
         else:
             # Only one milk type, no need to merge
             ws.write(first_row_for_customer, 0, customer.name, customer_style)
+            ws.write(first_row_for_customer, 1, customer.area.name if customer.area else "-", customer_style)
             
-            balance_col = 2 + days_in_month + 2
+            balance_col = 3 + days_in_month + 2
             overall_total_col = balance_col + 1
             
             ws.write(first_row_for_customer, balance_col, float(balance), amount_style)
@@ -2254,11 +2024,11 @@ def download_customer_data(request):
             if milk_type_quantity == 0 and balance == 0:
                 continue
             
-            # Write milk type name (column 1)
-            ws.write(current_row, 1, milk_type.name, cell_style)
+            # Write milk type name (column 2)
+            ws.write(current_row, 2, milk_type.name, cell_style)
             
             # Write daily quantities for this milk type
-            col_idx = 2  # Start from the first day column
+            col_idx = 3  # Start from the first day column (after customer, area, milk type)
             for day in range(1, days_in_month + 1):
                 day_date = datetime.date(selected_year, selected_month, day)
                 day_sales = milk_type_sales.filter(date=day_date)
@@ -2283,24 +2053,41 @@ def download_customer_data(request):
         row_idx = current_row
     
     # Set column width
-    col_count = 2 + days_in_month + 3  # Customer, Milk type, Days, Total L, Total Amount, Balance, Overall Total
+    col_count = 3 + days_in_month + 3  # Customer, Area, Milk type, Days, Total L, Total Amount, Balance, Overall Total
     for i in range(col_count):
         if i == 0:  # Customer name column
             ws.col(i).width = 256 * 30  # 30 characters wide
-        elif i == 1:  # Milk type column
+        elif i == 1:  # Area column
+            ws.col(i).width = 256 * 15  # 15 characters wide
+        elif i == 2:  # Milk type column
             ws.col(i).width = 256 * 10  # 10 characters wide
-        elif i <= 1 + days_in_month:  # Day columns
+        elif i <= 2 + days_in_month:  # Day columns
             ws.col(i).width = 256 * 5   # 5 characters wide
         else:
             ws.col(i).width = 256 * 15  # 15 characters wide
     
     # Create response with correct MIME type for Excel files
+    response = HttpResponse(content_type='application/vnd.ms-excel')
+    
+    # Set the Content-Disposition header with proper filename and extension
+    sanitized_filename = filename.replace(" ", "_")  # Replace spaces with underscores
+    response['Content-Disposition'] = f'attachment; filename="{sanitized_filename}.xls"'
+    
+    # Save workbook to response
+    wb.save(response)
+    return response
 
 @login_required
 def generate_customer_bill(request, pk):
     """Generate a PDF bill for a specific customer using a template PDF"""
     import os
     from django.conf import settings
+    
+    # Check if reportlab is available
+    if not REPORTLAB_AVAILABLE:
+        messages.error(request, _('PDF generation is not available. ReportLab is not installed.'))
+        return redirect('customer_detail', pk=pk)
+        
     from reportlab.lib.units import inch, cm
     from reportlab.pdfgen import canvas
     
@@ -2724,14 +2511,5 @@ def generate_customer_bill(request, pk):
     data_buffer.close()
     output_buffer.close()
     
-    return response
-    response = HttpResponse(content_type='application/vnd.ms-excel')
-    
-    # Set the Content-Disposition header with proper filename and extension
-    sanitized_filename = filename.replace(" ", "_")  # Replace spaces with underscores
-    response['Content-Disposition'] = f'attachment; filename="{sanitized_filename}.xls"'
-    
-    # Save workbook to response
-    wb.save(response)
     return response
 

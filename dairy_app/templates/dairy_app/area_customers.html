@@ -8,6 +8,10 @@
     <div class="row mb-4">
         <div class="col-md-8">
             <h1>{% trans "Customers in" %} {{ area.name }}</h1>
+            <p class="text-muted">
+                <i class="fas fa-info-circle"></i> 
+                {% trans "Drag and drop customers to reorder them for delivery route" %}
+            </p>
         </div>
         <div class="col-md-4 text-end">
             <a href="{% url 'customer_add' %}?area={{ area.id }}" class="btn btn-success">
@@ -26,10 +30,24 @@
     </div>
     {% endif %}
 
+    <!-- Toast notification for successful reordering -->
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+        <div id="reorderToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="fas fa-check-circle text-success me-2"></i>
+                <strong class="me-auto">{% trans "Success" %}</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                {% trans "Customer delivery order updated successfully!" %}
+            </div>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">{% trans "Customers" %}</h5>
+                <h5 class="mb-0">{% trans "Delivery Route Order" %}</h5>
                 <a href="{% url 'area_list' %}" class="btn btn-sm btn-secondary">
                     <i class="fas fa-arrow-left"></i> {% trans "Back to Areas" %}
                 </a>
@@ -37,10 +55,20 @@
         </div>
         <div class="card-body">
             {% if customers %}
+            <div id="loadingSpinner" class="text-center d-none">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">{% trans "Saving..." %}</span>
+                </div>
+                <p class="mt-2">{% trans "Updating delivery order..." %}</p>
+            </div>
+            
             <div class="table-responsive">
                 <table class="table table-striped table-bordered table-hover">
                     <thead class="table-light">
                         <tr>
+                            <th width="40">
+                                <i class="fas fa-sort text-muted" title="{% trans 'Drag to reorder' %}"></i>
+                            </th>
                             <th>#</th>
                             <th>{% trans "Name" %}</th>
                             <th>{% trans "Phone" %}</th>
@@ -48,10 +76,13 @@
                             <th>{% trans "Actions" %}</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="customerTableBody" class="sortable-customers">
                         {% for customer in customers %}
-                        <tr>
-                            <td>{{ forloop.counter }}</td>
+                        <tr class="draggable-row" draggable="true" data-customer-id="{{ customer.id }}">
+                            <td class="drag-handle">
+                                <i class="fas fa-grip-vertical text-muted" style="cursor: grab;"></i>
+                            </td>
+                            <td class="delivery-order">{{ forloop.counter }}</td>
                             <td>{{ customer.name }}</td>
                             <td>{{ customer.phone|default:"-" }}</td>
                             <td>{{ customer.address|default:"-" }}</td>
@@ -81,4 +112,175 @@
         </div>
     </div>
 </div>
+
+<style>
+/* Drag and drop styles */
+.draggable-row {
+    transition: all 0.3s ease;
+}
+
+.draggable-row.dragging {
+    opacity: 0.5;
+    transform: rotate(5deg);
+}
+
+.draggable-row.drag-over {
+    border-top: 3px solid #007bff;
+}
+
+.drag-handle {
+    cursor: grab;
+    text-align: center;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+.sortable-customers .draggable-row:hover {
+    background-color: #f8f9fa;
+}
+
+.delivery-order {
+    font-weight: bold;
+    color: #007bff;
+}
+
+/* Loading state */
+#loadingSpinner {
+    z-index: 1000;
+}
+</style>
+
+<script>
+// Set area ID as a global variable
+window.areaId = {{ area.id }};
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tbody = document.getElementById('customerTableBody');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const reorderToast = new bootstrap.Toast(document.getElementById('reorderToast'));
+    
+    let draggedElement = null;
+    let draggedIndex = null;
+
+    // Add event listeners to all draggable rows
+    function attachDragListeners() {
+        const rows = tbody.querySelectorAll('.draggable-row');
+        
+        rows.forEach((row, index) => {
+            row.addEventListener('dragstart', function(e) {
+                draggedElement = this;
+                draggedIndex = index;
+                this.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', this.outerHTML);
+            });
+
+            row.addEventListener('dragend', function(e) {
+                this.classList.remove('dragging');
+                draggedElement = null;
+                draggedIndex = null;
+                
+                // Remove drag-over class from all rows
+                rows.forEach(r => r.classList.remove('drag-over'));
+            });
+
+            row.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                
+                if (this !== draggedElement) {
+                    // Remove drag-over class from all rows
+                    rows.forEach(r => r.classList.remove('drag-over'));
+                    this.classList.add('drag-over');
+                }
+            });
+
+            row.addEventListener('dragenter', function(e) {
+                e.preventDefault();
+            });
+
+            row.addEventListener('dragleave', function(e) {
+                // Only remove drag-over if we're leaving the element completely
+                if (!this.contains(e.relatedTarget)) {
+                    this.classList.remove('drag-over');
+                }
+            });
+
+            row.addEventListener('drop', function(e) {
+                e.preventDefault();
+                
+                if (this !== draggedElement) {
+                    const dropIndex = Array.from(tbody.children).indexOf(this);
+                    
+                    if (draggedIndex < dropIndex) {
+                        this.parentNode.insertBefore(draggedElement, this.nextSibling);
+                    } else {
+                        this.parentNode.insertBefore(draggedElement, this);
+                    }
+                    
+                    updateDeliveryNumbers();
+                    saveNewOrder();
+                }
+                
+                this.classList.remove('drag-over');
+            });
+        });
+    }
+
+    // Update the delivery order numbers in the UI
+    function updateDeliveryNumbers() {
+        const rows = tbody.querySelectorAll('.draggable-row');
+        rows.forEach((row, index) => {
+            row.querySelector('.delivery-order').textContent = index + 1;
+        });
+    }
+
+    // Save the new order to the server
+    function saveNewOrder() {
+        const rows = tbody.querySelectorAll('.draggable-row');
+        const customerIds = Array.from(rows).map(row => row.getAttribute('data-customer-id'));
+        
+        // Show loading spinner
+        loadingSpinner.classList.remove('d-none');
+        
+        fetch('{% url "update_customer_order" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}',
+            },
+            body: JSON.stringify({
+                customer_ids: customerIds,
+                area_id: window.areaId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            loadingSpinner.classList.add('d-none');
+            
+            if (data.success) {
+                reorderToast.show();
+            } else {
+                alert('{% trans "Error updating customer order" %}: ' + data.error);
+                // Reload the page to reset the order
+                location.reload();
+            }
+        })
+        .catch(error => {
+            loadingSpinner.classList.add('d-none');
+            console.error('Error:', error);
+            alert('{% trans "Error updating customer order" %}');
+            // Reload the page to reset the order
+            location.reload();
+        });
+    }
+
+    // Initialize drag listeners
+    attachDragListeners();
+});
+</script>
 {% endblock %}

@@ -40,7 +40,7 @@
                             <dd class="col-sm-8">{{ object.milk_type.name }}</dd>
                             
                             <dt class="col-sm-4">{% trans "Quantity" %}</dt>
-                            <dd class="col-sm-8">{{ object.quantity|floatformat:1 }} {% trans "liters" %}</dd>
+                            <dd class="col-sm-8">{{ object.quantity|floatformat:2 }} {% trans "liters" %}</dd>
                             
                             <dt class="col-sm-4">{% trans "Rate" %}</dt>
                             <dd class="col-sm-8">₹{{ object.rate|floatformat:2 }} / {% trans "liter" %}</dd>

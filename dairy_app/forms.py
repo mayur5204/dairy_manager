@@ -89,7 +89,7 @@ class SaleForm(forms.ModelForm):
         fields = ['customer', 'milk_type', 'date', 'quantity', 'notes']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
-            'quantity': forms.NumberInput(attrs={'min': '0', 'step': '0.1'}),
+            'quantity': forms.NumberInput(attrs={'min': '0', 'step': '0.01'}),
         }
         labels = {
             'date': 'Date*',  # Label will be translated via django.po file
@@ -103,9 +103,15 @@ class SaleForm(forms.ModelForm):
     
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
+        customer_fixed = kwargs.pop('customer_fixed', False)
         super().__init__(*args, **kwargs)
-        # Show all customers
-        self.fields['customer'].queryset = Customer.objects.all()
+        
+        # If customer is fixed (coming from customer page), hide the customer field
+        if customer_fixed:
+            self.fields['customer'].widget = forms.HiddenInput()
+        else:
+            # Show all customers
+            self.fields['customer'].queryset = Customer.objects.all()
         
         # Show all milk types instead of filtering by customer
         self.fields['milk_type'].queryset = MilkType.objects.all()
@@ -204,9 +210,15 @@ class PaymentForm(forms.ModelForm):
     
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)  # Keep for backward compatibility but don't use it
+        customer_fixed = kwargs.pop('customer_fixed', False)
         super().__init__(*args, **kwargs)
-        # Show all customers regardless of user
-        self.fields['customer'].queryset = Customer.objects.all()
+        
+        # If customer is fixed (coming from customer page), hide the customer field
+        if customer_fixed:
+            self.fields['customer'].widget = forms.HiddenInput()
+        else:
+            # Show all customers regardless of user
+            self.fields['customer'].queryset = Customer.objects.all()
         
         # Ensure labels can be translated
         self.fields['date'].label = _('Date*')
@@ -275,54 +287,3 @@ class PaymentForm(forms.ModelForm):
             result.append(month_data)
             
         return result
-
-
-class DateRangeForm(forms.Form):
-    """Form for selecting date range for reports."""
-    start_date = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}))
-    end_date = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}))
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Ensure labels can be translated
-        from django.utils.translation import gettext_lazy as _
-        self.fields['start_date'].label = _('Start Date*')
-        self.fields['end_date'].label = _('End Date*')
-
-
-class MonthSelectionForm(forms.Form):
-    """Form for selecting month and year for monthly reports."""
-    from django.utils.translation import gettext_lazy as _
-    
-    MONTH_CHOICES = [
-        (1, _('January')), (2, _('February')), (3, _('March')),
-        (4, _('April')), (5, _('May')), (6, _('June')),
-        (7, _('July')), (8, _('August')), (9, _('September')),
-        (10, _('October')), (11, _('November')), (12, _('December'))
-    ]
-    
-    month = forms.ChoiceField(choices=MONTH_CHOICES)
-    year = forms.ChoiceField()
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        
-        # Dynamically generate year choices (current year and 2 years back)
-        current_year = datetime.date.today().year
-        year_choices = [(year, str(year)) for year in range(current_year - 2, current_year + 1)]
-        self.fields['year'].choices = year_choices
-        
-        # Ensure labels can be translated
-        from django.utils.translation import gettext_lazy as _
-        self.fields['month'].label = _('Select Month')
-        self.fields['year'].label = _('Select Year')
-        
-        # Add dropdown icon styling using Bootstrap classes
-        self.fields['month'].widget.attrs.update({
-            'class': 'form-select',
-            'aria-label': _('Select Month')
-        })
-        self.fields['year'].widget.attrs.update({
-            'class': 'form-select',
-            'aria-label': _('Select Year')
-        })

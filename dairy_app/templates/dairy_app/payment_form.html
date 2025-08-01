@@ -60,41 +60,64 @@
                     <input type="hidden" name="return" value="{{ return_to }}">
                     {% endif %}
                     
+                    <!-- Show customer info when coming from customer page -->
+                    {% if from_customer_page and customer %}
+                    <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+                        <i class="fas fa-user me-2"></i>
+                        <div>
+                            <strong>{% trans "Recording payment for:" %}</strong> {{ customer.name }}
+                            {% if customer.area %}<br><small class="text-muted">{{ customer.area.name }}</small>{% endif %}
+                        </div>
+                    </div>
+                    {{ form.customer.as_hidden }}
+                    {% endif %}
+                    
                     <div class="row">
                         <div class="col-md-6">
-                            {% if from_customer_page or customer %}
-                                <div id="div_id_customer" class="mb-3">
-                                    <label class="form-label">{% trans "Customer" %}</label>
-                                    <div class="input-group">
-                                        <input type="text" class="form-control" value="{{ customer.name }}" readonly>
-                                        <input type="hidden" name="customer" value="{{ customer.id }}">
-                                        <a href="{% url 'payment_add' %}" class="btn btn-outline-secondary">
-                                            <i class="fas fa-times"></i> {% trans "Change" %}
-                                        </a>
-                                    </div>
-                                </div>
+                            {% if not from_customer_page and not customer %}
+                                {{ form.customer|as_crispy_field }}
+                            {% else %}
+                                {{ form.date|as_crispy_field }}
                             {% endif %}
                         </div>
                         <div class="col-md-6">
-                            {{ form.date|as_crispy_field }}
+                            {% if not from_customer_page and not customer %}
+                                {{ form.date|as_crispy_field }}
+                            {% else %}
+                                {{ form.amount|as_crispy_field }}
+                            {% endif %}
                         </div>
                     </div>
                     
                     <div class="row">
                         <div class="col-md-6">
-                            {{ form.amount|as_crispy_field }}
+                            {% if not from_customer_page and not customer %}
+                                {{ form.amount|as_crispy_field }}
+                            {% else %}
+                                {{ form.description|as_crispy_field }}
+                            {% endif %}
                         </div>
                         <div class="col-md-6">
-                            {{ form.description|as_crispy_field }}
+                            {% if not from_customer_page and not customer %}
+                                {{ form.description|as_crispy_field }}
+                            {% else %}
+                                {{ form.payment_for_month|as_crispy_field }}
+                            {% endif %}
                         </div>
                     </div>
                     
                     <div class="row">
                         <div class="col-md-6">
-                            {{ form.payment_for_month|as_crispy_field }}
+                            {% if not from_customer_page and not customer %}
+                                {{ form.payment_for_month|as_crispy_field }}
+                            {% else %}
+                                {{ form.payment_for_year|as_crispy_field }}
+                            {% endif %}
                         </div>
                         <div class="col-md-6">
-                            {{ form.payment_for_year|as_crispy_field }}
+                            {% if not from_customer_page and not customer %}
+                                {{ form.payment_for_year|as_crispy_field }}
+                            {% endif %}
                         </div>
                     </div>
                     

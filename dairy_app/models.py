@@ -54,9 +54,10 @@ class Customer(models.Model):
     milk_types = models.ManyToManyField(MilkType, related_name='customers')
     area = models.ForeignKey(Area, on_delete=models.SET_NULL, null=True, blank=True, related_name='customers')
     date_joined = models.DateTimeField(auto_now_add=True)
+    delivery_order = models.PositiveIntegerField(default=0, help_text=_('Order for delivery route within area'))
     
     class Meta:
-        ordering = ['name']
+        ordering = ['area', 'delivery_order', 'name']
     
     def __str__(self):
         return self.name
@@ -147,6 +148,9 @@ class Customer(models.Model):
                 status = 'no_sales'
             elif balance_info['month_balance'] <= 0:
                 status = 'paid'
+            elif balance_info['payment_total'] > 0:
+                # Partial payment - some payment made but not full amount
+                status = 'partial'
             else:
                 status = 'pending'
             
@@ -206,6 +210,26 @@ class Customer(models.Model):
             total=Sum('amount')
         )['total'] or Decimal('0')
         
+        # Also include payment allocations for this month
+        from django.apps import apps
+        try:
+            PaymentAllocation = apps.get_model('dairy_app', 'PaymentAllocation')
+            
+            # Get all payment allocations for this month and year
+            allocations = PaymentAllocation.objects.filter(
+                payment__customer=self,
+                month=month,
+                year=year
+            )
+            
+            allocated_payments = sum(alloc.amount for alloc in allocations) if allocations else Decimal('0')
+        except ImportError:
+            # PaymentAllocation model may not be available yet (during migrations)
+            allocated_payments = Decimal('0')
+        
+        # Total payments for this month (direct + allocated)
+        month_payments = month_payments + allocated_payments
+        
         # Calculate sales and payments for all previous months
         previous_sales = Sale.objects.filter(
             customer=self,
@@ -217,6 +241,7 @@ class Customer(models.Model):
         # For previous payments, we need to account for:
         # 1. Payments made before this month that weren't assigned to any specific month
         # 2. Payments specifically assigned to months before this month
+        # 3. Payment allocations to months before this month
         prev_unassigned_payments = Payment.objects.filter(
             customer=self,
             date__lt=start_date,
@@ -242,7 +267,32 @@ class Customer(models.Model):
             total=Sum('amount')
         )['total'] or Decimal('0')
         
-        previous_payments = prev_unassigned_payments + prev_assigned_payments + same_year_prev_months
+        # Also include payment allocations for previous months
+        try:
+            PaymentAllocation = apps.get_model('dairy_app', 'PaymentAllocation')
+            
+            # Get payment allocations for previous years
+            prev_year_allocations = PaymentAllocation.objects.filter(
+                payment__customer=self,
+                year__lt=year
+            ).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0')
+            
+            # Get payment allocations for this year but earlier months
+            same_year_prev_month_allocations = PaymentAllocation.objects.filter(
+                payment__customer=self,
+                year=year,
+                month__lt=month
+            ).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0')
+            
+            prev_allocated_payments = prev_year_allocations + same_year_prev_month_allocations
+        except ImportError:
+            prev_allocated_payments = Decimal('0')
+        
+        previous_payments = prev_unassigned_payments + prev_assigned_payments + same_year_prev_months + prev_allocated_payments
         
         # Calculate balances
         month_balance = month_sales - month_payments
@@ -288,39 +338,111 @@ class Customer(models.Model):
         current_year = start_year
         
         for i in range(6):
-            # Get or create monthly balance record
-            try:
-                monthly_balance = MonthlyBalance.objects.get(
-                    customer=self,
-                    year=current_year,
-                    month=current_month
-                )
-                sales_amount = monthly_balance.sales_amount
-                payment_amount = monthly_balance.payment_amount
-                is_paid = monthly_balance.is_paid
-                balance = sales_amount - payment_amount
-            except MonthlyBalance.DoesNotExist:
-                # If no record exists, calculate manually
-                month_balance_info = self.get_month_balance(current_year, current_month)
-                sales_amount = month_balance_info['sales_total']
-                payment_amount = month_balance_info['payment_total']
-                balance = month_balance_info['month_balance']
-                is_paid = balance <= 0 and sales_amount > 0
+            # Always use manual calculation to ensure payment allocations are included
+            month_balance_info = self.get_month_balance(current_year, current_month)
+            sales_amount = month_balance_info['sales_total']
+            payment_amount = month_balance_info['payment_total']
+            balance = month_balance_info['month_balance']
+            is_paid = balance <= 0 and sales_amount > 0
             
-            # Determine status
+            # Determine status - Fixed logic order
             if sales_amount == 0:
                 status = 'no_sales'
                 status_class = 'secondary'
                 status_text = 'No Sales'
-            elif is_paid or balance <= 0:
+            elif balance <= 0:  # Remove is_paid check here to avoid conflicts
                 status = 'paid'
                 status_class = 'success'
                 status_text = 'Paid'
+            elif payment_amount > 0:
+                # Partial payment - some payment made but not full amount
+                status = 'partial'
+                status_class = 'warning'
+                status_text = 'Partial Payment'
             else:
                 status = 'pending'
                 status_class = 'danger'
                 status_text = 'Pending'
             
+            # Find payment date for this month - improved logic to show latest payment
+            payment_date = None
+            
+            # Strategy 1: Check for direct payments with payment_for_month/year
+            direct_payment = self.payments.filter(
+                payment_for_month=current_month,
+                payment_for_year=current_year
+            ).order_by('-date').first()
+            
+            if direct_payment:
+                payment_date = direct_payment.date
+            else:
+                # Strategy 2: Check for payment allocations
+                from django.apps import apps
+                try:
+                    PaymentAllocation = apps.get_model('dairy_app', 'PaymentAllocation')
+                    
+                    # Look for any allocation for this specific month/year
+                    allocation = PaymentAllocation.objects.filter(
+                        payment__customer=self,
+                        month=current_month,
+                        year=current_year
+                    ).select_related('payment').order_by('-payment__date').first()
+                    
+                    if allocation:
+                        payment_date = allocation.payment.date
+                    else:
+                        # Strategy 3: If month shows as paid but no specific allocation found,
+                        # look for payments made during that month period that might have been
+                        # automatically allocated
+                        if payment_amount > 0:
+                            import datetime
+                            start_date = datetime.date(current_year, current_month, 1)
+                            if current_month == 12:
+                                end_date = datetime.date(current_year + 1, 1, 1) - datetime.timedelta(days=1)
+                            else:
+                                end_date = datetime.date(current_year, current_month + 1, 1) - datetime.timedelta(days=1)
+                            
+                            # Look for any payment made during this month that could have been allocated
+                            month_payment = self.payments.filter(
+                                date__gte=start_date,
+                                date__lte=end_date
+                            ).order_by('-date').first()
+                            
+                            if month_payment:
+                                payment_date = month_payment.date
+                            else:
+                                # Strategy 4: Look for any payment that has an allocation to this month
+                                # (regardless of when the payment was made)
+                                any_allocation = PaymentAllocation.objects.filter(
+                                    payment__customer=self,
+                                    month=current_month,
+                                    year=current_year
+                                ).select_related('payment').order_by('-payment__date').first()
+                                
+                                if any_allocation:
+                                    payment_date = any_allocation.payment.date
+                                
+                except ImportError:
+                    # PaymentAllocation model may not be available yet
+                    pass
+            
+            # Strategy 5: For fully paid months, show the latest payment that contributed to making it paid
+            if status == 'paid' and payment_date is None:
+                try:
+                    PaymentAllocation = apps.get_model('dairy_app', 'PaymentAllocation')
+                    
+                    # Get the latest payment allocation for this month
+                    latest_allocation = PaymentAllocation.objects.filter(
+                        payment__customer=self,
+                        month=current_month,
+                        year=current_year
+                    ).select_related('payment').order_by('-payment__date').first()
+                    
+                    if latest_allocation:
+                        payment_date = latest_allocation.payment.date
+                except ImportError:
+                    pass
+
             months_data.append({
                 'year': current_year,
                 'month': current_month,
@@ -332,7 +454,8 @@ class Customer(models.Model):
                 'status': status,
                 'status_class': status_class,
                 'status_text': status_text,
-                'is_paid': is_paid
+                'is_paid': is_paid,
+                'payment_date': payment_date
             })
             
             # Move to next month

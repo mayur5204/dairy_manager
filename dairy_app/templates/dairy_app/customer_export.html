@@ -24,7 +24,7 @@
     <div class="card-body">
         <form method="post" class="row g-3" id="export-form">
             {% csrf_token %}
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label for="id_month" class="form-label">{% trans "Month*" %}</label>
                 <select name="month" id="id_month" class="form-select">
                     {% for month in month_options %}
@@ -34,7 +34,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label for="id_year" class="form-label">{% trans "Year*" %}</label>
                 <select name="year" id="id_year" class="form-select">
                     {% for year in year_options %}
@@ -44,7 +44,18 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-4 align-self-end">
+            <div class="col-md-3">
+                <label for="id_area" class="form-label">{% trans "Area" %}</label>
+                <select name="area" id="id_area" class="form-select">
+                    <option value="">{% trans "All Areas" %}</option>
+                    {% for area in areas %}
+                        <option value="{{ area.id }}" {% if selected_area == area.id|stringformat:"s" %}selected{% endif %}>
+                            {{ area.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 align-self-end">
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-sync"></i> {% trans "Update Preview" %}
                 </button>
@@ -58,7 +69,7 @@
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">{% trans "Customer Data for" %} {{ month_name }} {{ selected_year }}</h5>
         <div class="btn-group">
-            <a href="{% url 'download_customer_data' %}?month={{ selected_month }}&year={{ selected_year }}&format=excel" class="btn btn-primary btn-sm">
+            <a href="{% url 'download_customer_data' %}?month={{ selected_month }}&year={{ selected_year }}{% if selected_area %}&area={{ selected_area }}{% endif %}&format=excel" class="btn btn-primary btn-sm">
                 <i class="fas fa-file-excel"></i> {% trans "Export as Excel" %}
             </a>
         </div>
@@ -73,6 +84,7 @@
                 <thead>
                     <tr>
                         <th style="min-width: 160px;" rowspan="2" class="align-middle">{% trans "Customer" %}</th>
+                        <th style="min-width: 100px;" rowspan="2" class="align-middle">{% trans "Area" %}</th>
                         <th style="min-width: 80px;" rowspan="2" class="align-middle">{% trans "Milk Type" %}</th>
                         <th colspan="{{ preview_days }}" class="text-center">{% trans "Daily Milk Delivery (liters)" %}</th>
                         <th style="min-width: 80px;" rowspan="2" class="align-middle">{% trans "Total (L)" %}</th>
@@ -96,6 +108,9 @@
                                         <td rowspan="{{ customer_data.milk_types|length }}" class="align-middle">
                                             <strong>{{ customer.name }}</strong>
                                         </td>
+                                        <td rowspan="{{ customer_data.milk_types|length }}" class="align-middle">
+                                            {{ customer.area.name|default:"-" }}
+                                        </td>
                                     {% endif %}
                                     
                                     <td class="text-center">
@@ -105,12 +120,12 @@
                                     {% for day in day_range|slice:":7" %}
                                         <td class="text-center">
                                             {% with quantity=milk_type_data.daily_data|get_item:day %}
-                                                {% if quantity > 0 %}{{ quantity|floatformat:1 }}{% else %}-{% endif %}
+                                                {% if quantity > 0 %}{{ quantity|floatformat:2 }}{% else %}-{% endif %}
                                             {% endwith %}
                                         </td>
                                     {% endfor %}
                                     
-                                    <td class="text-end fw-bold">{{ milk_type_data.total_quantity|floatformat:1 }}</td>
+                                    <td class="text-end fw-bold">{{ milk_type_data.total_quantity|floatformat:2 }}</td>
                                     <td class="text-end">₹{{ milk_type_data.total_amount|floatformat:2 }}</td>
                                     
                                     {% if milk_idx == 0 %}
@@ -142,9 +157,6 @@
             <div class="mt-4">
                 <a href="{% url 'customer_add' %}" class="btn btn-primary me-2">
                     <i class="fas fa-plus-circle"></i> {% trans "Add Customer" %}
-                </a>
-                <a href="{% url 'sale_add' %}" class="btn btn-info">
-                    <i class="fas fa-milk"></i> {% trans "Add Sale" %}
                 </a>
             </div>
         </div>

@@ -219,6 +219,7 @@
                                 <th>{% trans "Payments" %}</th>
                                 <th>{% trans "Balance" %}</th>
                                 <th>{% trans "Status" %}</th>
+                                <th>{% trans "Payment Date" %}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -232,6 +233,19 @@
                                 </td>
                                 <td>
                                     <span class="badge bg-{{ month_status.status_class }}">{{ month_status.status_text }}</span>
+                                </td>
+                                <td class="payment-date-cell">
+                                    {% if month_status.payment_date %}
+                                        <span class="text-success">
+                                            <i class="fas fa-calendar-check me-1"></i>
+                                            {{ month_status.payment_date|date:"M d, Y" }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">
+                                            <i class="fas fa-minus me-1"></i>
+                                            {% trans "No payment" %}
+                                        </span>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -332,7 +346,7 @@
                                 {% for milk_type in milk_types %}
                                 <td>
                                     {% if data.milk_data|get_item:milk_type.name > 0 %}
-                                    {{ data.milk_data|get_item:milk_type.name|floatformat:1 }} L
+                                    {{ data.milk_data|get_item:milk_type.name|floatformat:2 }} L
                                     {% else %}
                                     -
                                     {% endif %}
@@ -340,7 +354,7 @@
                                 {% endfor %}
                                 <td class="fw-bold {% if data.total > 0 %}text-success{% endif %}">
                                     {% if data.total > 0 %}
-                                    {{ data.total|floatformat:1 }} L
+                                    {{ data.total|floatformat:2 }} L
                                     {% else %}
                                     -
                                     {% endif %}
@@ -354,13 +368,13 @@
                                 {% for milk_type in milk_types %}
                                 <th>
                                     {% if milk_type_totals|get_item:milk_type.name > 0 %}
-                                    {{ milk_type_totals|get_item:milk_type.name|floatformat:1 }} L
+                                    {{ milk_type_totals|get_item:milk_type.name|floatformat:2 }} L
                                     {% else %}
                                     -
                                     {% endif %}
                                 </th>
                                 {% endfor %}
-                                <th>{{ month_total|floatformat:1 }} L</th>
+                                <th>{{ month_total|floatformat:2 }} L</th>
                             </tr>
                         </tfoot>
                     </table>
@@ -401,7 +415,7 @@
                             <tr>
                                 <td>{{ sale.date|date:"d M, Y" }}</td>
                                 <td>{{ sale.milk_type.name }}</td>
-                                <td>{{ sale.quantity|floatformat:1 }} L</td>
+                                <td>{{ sale.quantity|floatformat:2 }} L</td>
                                 <td>₹{{ sale.rate|floatformat:2 }}</td>
                                 <td>₹{{ sale.total_amount|floatformat:2 }}</td>
                                 <td>

@@ -7,13 +7,6 @@
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2"><i class="fas fa-money-bill-wave text-primary"></i> {% trans "Payments" %}</h1>
-    <div class="btn-toolbar mb-2 mb-md-0">
-        <div class="btn-group me-2">
-            <a href="{% url 'payment_add' %}" class="btn btn-sm btn-primary">
-                <i class="fas fa-plus-circle"></i> {% trans "Add Payment" %}
-            </a>
-        </div>
-    </div>
 </div>
 
 <div class="card">
@@ -115,10 +108,7 @@
         <div class="text-center py-5">
             <i class="fas fa-money-bill-wave fa-3x text-muted mb-3"></i>
             <p class="lead">{% trans "No payment records found" %}</p>
-            <p class="text-muted">{% trans "Record customer payments to keep track of your business" %}</p>
-            <a href="{% url 'payment_add' %}" class="btn btn-primary">
-                <i class="fas fa-plus-circle"></i> {% trans "Add Payment" %}
-            </a>
+            <p class="text-muted">{% trans "Record customer payments from the customer detail page" %}</p>
         </div>
         {% endif %}
     </div>

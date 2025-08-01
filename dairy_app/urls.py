@@ -30,6 +30,7 @@ urlpatterns = [
     path('customers/<int:pk>/edit/', views.CustomerUpdateView.as_view(), name='customer_edit'),
     path('customers/<int:pk>/delete/', views.CustomerDeleteView.as_view(), name='customer_delete'),
     path('search-customers/', views.search_customers, name='search_customers'),
+    path('ajax/update-customer-order/', views.update_customer_order, name='update_customer_order'),
     
     # Sale URLs
     path('sales/', views.SaleListView.as_view(), name='sale_list'),
@@ -46,8 +47,6 @@ urlpatterns = [
     path('payments/<int:pk>/delete/', views.PaymentDeleteView.as_view(), name='payment_delete'),
     
     # Report URLs
-    path('reports/daily/', views.daily_report_view, name='daily_report'),
-    path('reports/monthly/', views.monthly_report_view, name='monthly_report'),
     path('reports/customer-export/', views.customer_export_view, name='customer_export'),
     path('reports/customer-export/download/', views.download_customer_data, name='download_customer_data'),
     
