@@ -12,15 +12,28 @@
     </h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group me-2">
-            <a href="{% if form.instance.pk %}{% url 'customer_detail' form.instance.pk %}{% else %}{% url 'customer_list' %}{% endif %}" class="btn btn-sm btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> {% trans "Back" %}
-            </a>
+            {% if from_area_page and selected_area %}
+                <a href="{% url 'area_customers' selected_area.pk %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> {% trans "Back to Area" %}
+                </a>
+            {% else %}
+                <a href="{% if form.instance.pk %}{% url 'customer_detail' form.instance.pk %}{% else %}{% url 'customer_list' %}{% endif %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> {% trans "Back" %}
+                </a>
+            {% endif %}
         </div>
     </div>
 </div>
 
 <div class="row justify-content-center">
     <div class="col-lg-8">
+        {% if from_area_page and selected_area %}
+        <div class="alert alert-info mb-3">
+            <i class="fas fa-info-circle"></i>
+            {% trans "Adding customer to area:" %} <strong>{{ selected_area.name }}</strong>
+        </div>
+        {% endif %}
+        
         <div class="card">
             <div class="card-body">
                 <form method="post">
@@ -51,9 +64,15 @@
                     </div>
                     
                     <div class="mt-4 text-end">
-                        <a href="{% if form.instance.pk %}{% url 'customer_detail' form.instance.pk %}{% else %}{% url 'customer_list' %}{% endif %}" class="btn btn-outline-secondary">
-                            {% trans "Cancel" %}
-                        </a>
+                        {% if from_area_page and selected_area %}
+                            <a href="{% url 'area_customers' selected_area.pk %}" class="btn btn-outline-secondary">
+                                {% trans "Cancel" %}
+                            </a>
+                        {% else %}
+                            <a href="{% if form.instance.pk %}{% url 'customer_detail' form.instance.pk %}{% else %}{% url 'customer_list' %}{% endif %}" class="btn btn-outline-secondary">
+                                {% trans "Cancel" %}
+                            </a>
+                        {% endif %}
                         <button type="submit" class="btn btn-primary">
                             {% if form.instance.pk %}{% trans "Update" %}{% else %}{% trans "Save" %}{% endif %} {% trans "Customer" %}
                         </button>

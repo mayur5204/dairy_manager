@@ -252,6 +252,91 @@ class Customer(models.Model):
             'start_date': start_date,
             'end_date': end_date
         }
+    
+    def get_last_six_months_status(self):
+        """
+        Get the monthly balance status for the last 6 months.
+        Returns a list of dictionaries with month-wise balance information.
+        """
+        import datetime
+        from calendar import month_name
+        from decimal import Decimal
+        
+        # Update monthly balances first to ensure they're current
+        MonthlyBalance.update_monthly_balances(self)
+        
+        # Get current date
+        today = datetime.date.today()
+        
+        # Calculate start date (6 months ago)
+        if today.month > 6:
+            start_month = today.month - 6
+            start_year = today.year
+        else:
+            start_month = today.month - 6 + 12
+            start_year = today.year - 1
+        
+        # Generate list of last 6 months
+        months_data = []
+        current_month = start_month
+        current_year = start_year
+        
+        for i in range(6):
+            # Get or create monthly balance record
+            try:
+                monthly_balance = MonthlyBalance.objects.get(
+                    customer=self,
+                    year=current_year,
+                    month=current_month
+                )
+                sales_amount = monthly_balance.sales_amount
+                payment_amount = monthly_balance.payment_amount
+                is_paid = monthly_balance.is_paid
+                balance = sales_amount - payment_amount
+            except MonthlyBalance.DoesNotExist:
+                # If no record exists, calculate manually
+                month_balance_info = self.get_month_balance(current_year, current_month)
+                sales_amount = month_balance_info['sales_total']
+                payment_amount = month_balance_info['payment_total']
+                balance = month_balance_info['month_balance']
+                is_paid = balance <= 0 and sales_amount > 0
+            
+            # Determine status
+            if sales_amount == 0:
+                status = 'no_sales'
+                status_class = 'secondary'
+                status_text = 'No Sales'
+            elif is_paid or balance <= 0:
+                status = 'paid'
+                status_class = 'success'
+                status_text = 'Paid'
+            else:
+                status = 'pending'
+                status_class = 'danger'
+                status_text = 'Pending'
+            
+            months_data.append({
+                'year': current_year,
+                'month': current_month,
+                'month_name': month_name[current_month],
+                'month_short': month_name[current_month][:3],
+                'sales_amount': sales_amount,
+                'payment_amount': payment_amount,
+                'balance': balance,
+                'status': status,
+                'status_class': status_class,
+                'status_text': status_text,
+                'is_paid': is_paid
+            })
+            
+            # Move to next month
+            current_month += 1
+            if current_month > 12:
+                current_month = 1
+                current_year += 1
+        
+        # Return in reverse order (most recent first)
+        return list(reversed(months_data))
 
 
 class Sale(models.Model):

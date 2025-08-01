@@ -72,8 +72,8 @@ def search_customers(request):
     results = []
     
     if search_query:
-        # Search for customers by name
-        customers = Customer.objects.filter(name__icontains=search_query)[:10]  # Limit to 10 results
+        # Search for customers by name, ordered by creation time for milk distribution route
+        customers = Customer.objects.filter(name__icontains=search_query).order_by('date_joined')[:10]  # Limit to 10 results
         
         # Format results with highlighting
         for idx, customer in enumerate(customers):
@@ -231,7 +231,7 @@ class AreaDeleteView(LoginRequiredMixin, DeleteView):
 def area_customers_view(request, pk):
     """View customers for a specific area"""
     area = get_object_or_404(Area, pk=pk, user=request.user)
-    customers = Customer.objects.filter(area=area)
+    customers = Customer.objects.filter(area=area).order_by('date_joined')  # Sort by creation time for milk distribution route
     
     context = {
         'area': area,
@@ -285,9 +285,11 @@ class CustomerListView(LoginRequiredMixin, ListView):
         
         # Filter by area if specified
         area_id = self.request.GET.get('area')
+        area_filtered = False
         if area_id:
             try:
                 queryset = queryset.filter(area_id=area_id)
+                area_filtered = True
             except ValueError:
                 pass
                 
@@ -296,8 +298,13 @@ class CustomerListView(LoginRequiredMixin, ListView):
         if search_query:
             # More comprehensive search across name field
             queryset = queryset.filter(name__icontains=search_query)
-            
-        return queryset.order_by('name')  # Ensure consistent ordering
+        
+        # Order by creation time when filtering by area (for milk distribution route),
+        # otherwise order by name for general browsing
+        if area_filtered:
+            return queryset.order_by('date_joined')  # Milk distribution route order
+        else:
+            return queryset.order_by('name')  # Alphabetical for general browsing
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -647,10 +654,13 @@ class CustomerDetailView(LoginRequiredMixin, DetailView):
         # Get pending months (months with unpaid balances)
         context['pending_months'] = customer.get_pending_months()
         
-        # Get all monthly balances
+        # Get all monthly balances - show last 6 months
         context['monthly_balances'] = MonthlyBalance.objects.filter(
             customer=customer
-        ).order_by('-year', '-month')[:12]  # Show last 12 months
+        ).order_by('-year', '-month')[:6]  # Show last 6 months
+        
+        # Get last 6 months status with detailed information
+        context['last_six_months_status'] = customer.get_last_six_months_status()
         
         # Get payment allocations for each month
         from django.db.models import Prefetch
@@ -680,6 +690,77 @@ class CustomerDetailView(LoginRequiredMixin, DetailView):
         current_year = today.year
         context['year_options'] = range(current_year - 2, current_year + 1)
         
+        # Add navigation for previous/next customer in the same area
+        if customer.area:
+            # Get customers in the same area, ordered by creation time (milk distribution route order)
+            area_customers = Customer.objects.filter(
+                area=customer.area
+            ).order_by('date_joined')
+            
+            # Convert to list to find current customer's position
+            customer_list = list(area_customers)
+            
+            try:
+                current_index = customer_list.index(customer)
+                
+                # Get previous customer
+                if current_index > 0:
+                    context['previous_customer'] = customer_list[current_index - 1]
+                else:
+                    context['previous_customer'] = None
+                
+                # Get next customer
+                if current_index < len(customer_list) - 1:
+                    context['next_customer'] = customer_list[current_index + 1]
+                else:
+                    context['next_customer'] = None
+                
+                # Add area navigation info
+                context['area_customer_position'] = current_index + 1
+                context['area_total_customers'] = len(customer_list)
+                context['area_name'] = customer.area.name
+                
+            except ValueError:
+                # Customer not found in area (shouldn't happen, but handle gracefully)
+                context['previous_customer'] = None
+                context['next_customer'] = None
+                context['area_customer_position'] = 1
+                context['area_total_customers'] = 1
+        else:
+            # If customer has no area, get all customers without area ordered by creation time
+            no_area_customers = Customer.objects.filter(
+                area__isnull=True
+            ).order_by('date_joined')
+            
+            customer_list = list(no_area_customers)
+            
+            try:
+                current_index = customer_list.index(customer)
+                
+                # Get previous customer
+                if current_index > 0:
+                    context['previous_customer'] = customer_list[current_index - 1]
+                else:
+                    context['previous_customer'] = None
+                
+                # Get next customer
+                if current_index < len(customer_list) - 1:
+                    context['next_customer'] = customer_list[current_index + 1]
+                else:
+                    context['next_customer'] = None
+                
+                # Add navigation info for no-area customers
+                context['area_customer_position'] = current_index + 1
+                context['area_total_customers'] = len(customer_list)
+                context['area_name'] = 'Unassigned'
+                
+            except ValueError:
+                # Customer not found (shouldn't happen)
+                context['previous_customer'] = None
+                context['next_customer'] = None
+                context['area_customer_position'] = 1
+                context['area_total_customers'] = 1
+        
         return context
 
 
@@ -693,6 +774,57 @@ class CustomerCreateView(LoginRequiredMixin, CreateView):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
+    
+    def get_initial(self):
+        """Pre-fill the area field if coming from an area page"""
+        initial = super().get_initial()
+        
+        # Check if area parameter is provided in URL
+        area_id = self.request.GET.get('area')
+        if area_id:
+            try:
+                # Verify the area exists and belongs to the user
+                area = Area.objects.get(id=area_id, user=self.request.user)
+                initial['area'] = area
+            except (Area.DoesNotExist, ValueError):
+                # If area doesn't exist or doesn't belong to user, ignore
+                pass
+        
+        return initial
+    
+    def get_context_data(self, **kwargs):
+        """Add area context for display purposes"""
+        context = super().get_context_data(**kwargs)
+        
+        # Check if area parameter is provided in URL for context
+        area_id = self.request.GET.get('area')
+        if area_id:
+            try:
+                # Verify the area exists and belongs to the user
+                area = Area.objects.get(id=area_id, user=self.request.user)
+                context['selected_area'] = area
+                context['from_area_page'] = True
+            except (Area.DoesNotExist, ValueError):
+                # If area doesn't exist or doesn't belong to user, ignore
+                context['from_area_page'] = False
+        else:
+            context['from_area_page'] = False
+        
+        return context
+    
+    def get_success_url(self):
+        """Redirect to area customers page if coming from an area, otherwise to customer list"""
+        area_id = self.request.GET.get('area')
+        if area_id:
+            try:
+                # Verify the area exists and belongs to the user
+                Area.objects.get(id=area_id, user=self.request.user)
+                return reverse_lazy('area_customers', kwargs={'pk': area_id})
+            except (Area.DoesNotExist, ValueError):
+                # If area doesn't exist or doesn't belong to user, use default
+                pass
+        
+        return reverse_lazy('customer_list')
     
     def form_valid(self, form):
         # Use the first admin user as default owner for all records
@@ -821,7 +953,7 @@ def sale_create_view(request):
     # Handle search query
     search_query = request.GET.get('search', '').strip()
     if search_query:
-        search_results = Customer.objects.filter(name__icontains=search_query)
+        search_results = Customer.objects.filter(name__icontains=search_query).order_by('date_joined')  # Order by route sequence
     
     # Handle customer selection
     customer_id = request.GET.get('customer')
@@ -990,22 +1122,31 @@ def payment_create_view(request):
     search_results = None
     from_customer_page = False
     
+    # Handle customer selection
+    customer_id = request.GET.get('customer')
+    fetch_unpaid = request.GET.get('fetch_unpaid') == 'true'
+    return_to = request.GET.get('return', '')
+    
     # Check if user is coming from customer detail page
-    referer = request.META.get('HTTP_REFERER', '')
-    from_customer_page = '/customers/' in referer
+    # First check if return parameter is provided (most reliable)
+    if return_to == 'customer_detail':
+        from_customer_page = True
+    elif customer_id:
+        # If customer parameter is provided, likely from customer page
+        from_customer_page = True
+    else:
+        # Fallback to referer check
+        referer = request.META.get('HTTP_REFERER', '')
+        from_customer_page = '/customers/' in referer
     
     # If no customer selected and not from customer page, redirect to customer list with search
-    if not request.GET.get('customer') and not from_customer_page:
+    if not customer_id and not from_customer_page:
         return redirect('customer_list')
     
     # Handle search query
     search_query = request.GET.get('search', '').strip()
     if search_query:
-        search_results = Customer.objects.filter(name__icontains=search_query)
-    
-    # Handle customer selection
-    customer_id = request.GET.get('customer')
-    fetch_unpaid = request.GET.get('fetch_unpaid') == 'true'
+        search_results = Customer.objects.filter(name__icontains=search_query).order_by('date_joined')  # Order by route sequence
     
     if customer_id:
         try:
@@ -1111,9 +1252,12 @@ def payment_create_view(request):
             
             messages.success(request, "Payment recorded successfully!")
             
+            # Check return preference - prioritize return parameter, then other indicators
+            return_to = request.POST.get('return', request.GET.get('return', ''))
+            
             # If coming from customer detail page, redirect back there
-            if from_customer_page and customer:
-                return redirect('customer_detail', pk=customer.id)
+            if (return_to == 'customer_detail' or from_customer_page) and payment.customer:
+                return redirect('customer_detail', pk=payment.customer.id)
             return redirect('payment_list')
     
     context = {
@@ -1121,6 +1265,7 @@ def payment_create_view(request):
         'customer': customer,
         'from_customer_page': from_customer_page,
         'search_results': search_results,
+        'return_to': return_to,
     }
     
     return render(request, 'dairy_app/payment_form.html', context)
@@ -1130,24 +1275,280 @@ class PaymentUpdateView(LoginRequiredMixin, UpdateView):
     model = Payment
     form_class = PaymentForm
     template_name = 'dairy_app/payment_form.html'
-    success_url = reverse_lazy('payment_list')
     
     def get_queryset(self):
         # Return all payments
         return Payment.objects.all()
     
+    def get(self, request, *args, **kwargs):
+        """Handle GET requests, including AJAX requests for unpaid months."""
+        self.object = self.get_object()
+        
+        # Handle AJAX request for fetching unpaid months
+        fetch_unpaid = request.GET.get('fetch_unpaid') == 'true'
+        customer_id = request.GET.get('customer')
+        
+        if fetch_unpaid and 'HTTP_X_REQUESTED_WITH' in request.META and customer_id:
+            try:
+                from .models import Customer, MonthlyBalance
+                customer = Customer.objects.get(id=customer_id)
+                form = PaymentForm(instance=self.object, initial={'customer': customer})
+                
+                # Force recalculation first for accurate data
+                MonthlyBalance.update_monthly_balances(customer)
+                
+                # For editing payments, we need to include months that are currently allocated to this payment
+                unpaid_months = form.get_unpaid_months(customer)
+                
+                # Also get months that are currently allocated to this payment
+                try:
+                    from django.apps import apps
+                    PaymentAllocation = apps.get_model('dairy_app', 'PaymentAllocation')
+                    current_allocations = PaymentAllocation.objects.filter(payment=self.object)
+                    
+                    # Get monthly balances for months allocated to this payment
+                    for allocation in current_allocations:
+                        try:
+                            balance = MonthlyBalance.objects.get(
+                                customer=customer,
+                                year=allocation.year,
+                                month=allocation.month
+                            )
+                            
+                            # Check if this month is not already in unpaid_months
+                            month_already_included = any(
+                                month['month'] == allocation.month and month['year'] == allocation.year 
+                                for month in unpaid_months
+                            )
+                            
+                            if not month_already_included:
+                                # Add this month to the list as it's currently allocated to this payment
+                                from calendar import month_name
+                                month_data = {
+                                    'month': allocation.month,
+                                    'year': allocation.year,
+                                    'sales_amount': balance.sales_amount,
+                                    'payment_amount': balance.payment_amount - allocation.amount,  # Subtract current allocation
+                                    'remaining': balance.sales_amount - (balance.payment_amount - allocation.amount),
+                                    'month_name': month_name[allocation.month],
+                                    'is_currently_allocated': True  # Mark this for UI indication
+                                }
+                                unpaid_months.append(month_data)
+                        except MonthlyBalance.DoesNotExist:
+                            continue
+                    
+                    # Sort the combined list by year and month (newest first)
+                    unpaid_months.sort(key=lambda x: (x['year'], x['month']), reverse=True)
+                    
+                except ImportError:
+                    # PaymentAllocation model may not be available
+                    pass
+                
+                form.unpaid_months = unpaid_months
+                
+                # Render the partial template with just the unpaid months
+                return render(request, 'dairy_app/payment_form_partial.html', {
+                    'form': form,
+                    'customer': customer
+                })
+            except Customer.DoesNotExist:
+                pass
+        
+        # Default behavior for non-AJAX requests
+        return super().get(request, *args, **kwargs)
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         # Add customer to context so the template doesn't redirect to search
         context['customer'] = self.object.customer
+        
+        # Check return preference
+        return_to = self.request.GET.get('return', '')
+        if return_to == 'customer_detail':
+            context['from_customer_page'] = True
+        else:
+            # Check if we came from customer detail page via referer
+            referer = self.request.META.get('HTTP_REFERER', '')
+            context['from_customer_page'] = '/customers/' in referer
+        
+        context['return_to'] = return_to
+        
+        # Add unpaid months to the form for multi-month functionality
+        from .models import MonthlyBalance
+        if self.object.customer:
+            MonthlyBalance.update_monthly_balances(self.object.customer)
+            unpaid_months = context['form'].get_unpaid_months(self.object.customer)
+            
+            # For editing payments, also include months that are currently allocated to this payment
+            try:
+                from django.apps import apps
+                PaymentAllocation = apps.get_model('dairy_app', 'PaymentAllocation')
+                current_allocations = PaymentAllocation.objects.filter(payment=self.object)
+                
+                # Get monthly balances for months allocated to this payment
+                for allocation in current_allocations:
+                    try:
+                        balance = MonthlyBalance.objects.get(
+                            customer=self.object.customer,
+                            year=allocation.year,
+                            month=allocation.month
+                        )
+                        
+                        # Check if this month is not already in unpaid_months
+                        month_already_included = any(
+                            month['month'] == allocation.month and month['year'] == allocation.year 
+                            for month in unpaid_months
+                        )
+                        
+                        if not month_already_included:
+                            # Add this month to the list as it's currently allocated to this payment
+                            from calendar import month_name
+                            month_data = {
+                                'month': allocation.month,
+                                'year': allocation.year,
+                                'sales_amount': balance.sales_amount,
+                                'payment_amount': balance.payment_amount - allocation.amount,  # Subtract current allocation
+                                'remaining': balance.sales_amount - (balance.payment_amount - allocation.amount),
+                                'month_name': month_name[allocation.month],
+                                'is_currently_allocated': True  # Mark this for UI indication
+                            }
+                            unpaid_months.append(month_data)
+                    except MonthlyBalance.DoesNotExist:
+                        continue
+                
+                # Sort the combined list by year and month (newest first)
+                unpaid_months.sort(key=lambda x: (x['year'], x['month']), reverse=True)
+                
+            except ImportError:
+                # PaymentAllocation model may not be available
+                pass
+            
+            context['form'].unpaid_months = unpaid_months
+        
+        # Check if this payment has multi-month allocations
+        from django.apps import apps
+        try:
+            PaymentAllocation = apps.get_model('dairy_app', 'PaymentAllocation')
+            allocations = PaymentAllocation.objects.filter(payment=self.object)
+            if allocations.exists():
+                context['is_multi_month_payment'] = True
+                context['existing_allocations'] = allocations
+                # Mark as multi-month in the form
+                context['form'].initial['is_multi_month'] = True
+            else:
+                context['is_multi_month_payment'] = False
+        except:
+            context['is_multi_month_payment'] = False
+            
         return context
     
+    def get_success_url(self):
+        # Check return preference in both GET and POST
+        return_to = self.request.POST.get('return', self.request.GET.get('return', ''))
+        
+        if return_to == 'customer_detail' and self.object.customer:
+            return reverse_lazy('customer_detail', kwargs={'pk': self.object.customer.id})
+        
+        # Fallback to referer check
+        referer = self.request.META.get('HTTP_REFERER', '')
+        if '/customers/' in referer and self.object.customer:
+            return reverse_lazy('customer_detail', kwargs={'pk': self.object.customer.id})
+        
+        return reverse_lazy('payment_list')
+    
     def form_valid(self, form):
+        # Handle multi-month allocation updates
+        is_multi_month = form.cleaned_data.get('is_multi_month')
+        
+        if is_multi_month:
+            # For multi-month payments, clear single-month assignment
+            form.instance.payment_for_month = None
+            form.instance.payment_for_year = None
+        
         response = super().form_valid(form)
+        
+        # Handle multi-month allocation redistribution
+        if is_multi_month and 'selected_months' in self.request.POST:
+            # Process multiple month allocation similar to create view
+            selected_month_strings = self.request.POST.getlist('selected_months')
+            
+            # Parse the selected months from format "month_year"
+            selected_months = []
+            for month_str in selected_month_strings:
+                try:
+                    month, year = month_str.split('_')
+                    selected_months.append((int(month), int(year)))
+                except (ValueError, IndexError):
+                    continue
+            
+            if selected_months:
+                # CRITICAL: When editing a payment, we must temporarily remove existing allocations
+                # to get accurate unpaid amounts for redistribution calculation
+                from .models import MonthlyBalance
+                from django.apps import apps
+                PaymentAllocation = apps.get_model('dairy_app', 'PaymentAllocation')
+                current_allocations = PaymentAllocation.objects.filter(payment=self.object)
+                
+                # Store current allocations for potential restoration
+                current_allocation_data = []
+                for alloc in current_allocations:
+                    current_allocation_data.append({
+                        'month': alloc.month,
+                        'year': alloc.year,
+                        'amount': alloc.amount
+                    })
+                
+                # Temporarily delete current allocations to get accurate unpaid amounts
+                current_allocations.delete()
+                
+                # Update monthly balances to reflect the removal of current allocations
+                MonthlyBalance.update_monthly_balances(self.object.customer)
+                
+                # Get all monthly balances (both previously paid and unpaid) for redistribution
+                all_balances = MonthlyBalance.objects.filter(
+                    customer=self.object.customer,
+                    sales_amount__gt=0
+                ).order_by('year', 'month')
+                
+                # Create new allocations based on selected months and available amounts
+                allocations = []
+                amount_remaining = self.object.amount
+                
+                for balance in all_balances:
+                    if (balance.month, balance.year) not in selected_months:
+                        continue
+                    
+                    # Calculate how much to allocate to this month
+                    owed_amount = balance.sales_amount - balance.payment_amount
+                    allocation_amount = min(owed_amount, amount_remaining)
+                    
+                    if allocation_amount <= 0:
+                        continue
+                    
+                    # Create allocation for this month
+                    allocations.append({
+                        'month': balance.month,
+                        'year': balance.year,
+                        'amount': allocation_amount
+                    })
+                    
+                    amount_remaining -= allocation_amount
+                    
+                    if amount_remaining <= 0:
+                        break
+                
+                # Apply the new allocation distribution
+                if allocations:
+                    self.object.distribute_to_months(allocations)
+                else:
+                    # If no valid allocations could be created, restore original allocations
+                    if current_allocation_data:
+                        self.object.distribute_to_months(current_allocation_data)
         
         # Force recalculation of all monthly balances for this customer 
         # after saving the payment to ensure accurate balances
         customer = self.object.customer
+        from .models import MonthlyBalance
         MonthlyBalance.update_monthly_balances(customer)
         
         messages.success(self.request, "Payment updated successfully!")
@@ -1157,11 +1558,39 @@ class PaymentUpdateView(LoginRequiredMixin, UpdateView):
 class PaymentDeleteView(LoginRequiredMixin, DeleteView):
     model = Payment
     template_name = 'dairy_app/payment_confirm_delete.html'
-    success_url = reverse_lazy('payment_list')
     
     def get_queryset(self):
         # Return all payments
         return Payment.objects.all()
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Check return preference
+        return_to = self.request.GET.get('return', '')
+        context['return_to'] = return_to
+        
+        if return_to == 'customer_detail':
+            context['from_customer_page'] = True
+        else:
+            # Check if we came from customer detail page via referer
+            referer = self.request.META.get('HTTP_REFERER', '')
+            context['from_customer_page'] = '/customers/' in referer
+        
+        return context
+    
+    def get_success_url(self):
+        # Check return preference in both GET and POST
+        return_to = self.request.POST.get('return', self.request.GET.get('return', ''))
+        
+        if return_to == 'customer_detail' and self.object.customer:
+            return reverse_lazy('customer_detail', kwargs={'pk': self.object.customer.id})
+        
+        # Fallback to referer check
+        referer = self.request.META.get('HTTP_REFERER', '')
+        if '/customers/' in referer and self.object.customer:
+            return reverse_lazy('customer_detail', kwargs={'pk': self.object.customer.id})
+        
+        return reverse_lazy('payment_list')
     
     def delete(self, request, *args, **kwargs):
         # Get the customer before deleting the payment

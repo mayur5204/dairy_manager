@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
 {% load i18n %}
+{% load dict_filters %}
 
 {% block title %}{% if form.instance.pk %}{% trans "Edit" %}{% else %}{% trans "Add" %}{% endif %} {% trans "Payment" %} - {% trans "Dairy Manager" %}{% endblock %}
 
@@ -12,9 +13,15 @@
     </h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group me-2">
+            {% if from_customer_page and customer %}
+            <a href="{% url 'customer_detail' customer.id %}" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> {% trans "Back to Customer" %}
+            </a>
+            {% else %}
             <a href="{% url 'payment_list' %}" class="btn btn-sm btn-outline-secondary">
                 <i class="fas fa-arrow-left"></i> {% trans "Back to List" %}
             </a>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -47,6 +54,11 @@
                 {% else %}
                 <form method="post">
                     {% csrf_token %}
+                    
+                    <!-- Hidden field to preserve return destination -->
+                    {% if return_to %}
+                    <input type="hidden" name="return" value="{{ return_to }}">
+                    {% endif %}
                     
                     <div class="row">
                         <div class="col-md-6">
@@ -97,6 +109,47 @@
                         </div>
                     </div>
                     
+                    <!-- Show existing allocations for multi-month payments when editing -->
+                    {% if form.instance.pk and is_multi_month_payment %}
+                    <div class="alert alert-info mt-2 existing-allocations-info">
+                        <h6><i class="fas fa-info-circle"></i> {% trans "Current Payment Allocations" %}</h6>
+                        <p class="mb-2">{% trans "This payment is currently distributed across the following months:" %}</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>{% trans "Month" %}</th>
+                                        <th>{% trans "Amount" %}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for allocation in existing_allocations %}
+                                    <tr>
+                                        <td>{{ allocation.month|month_name }} {{ allocation.year }}</td>
+                                        <td>₹{{ allocation.amount|floatformat:2 }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot class="table-light">
+                                    <tr>
+                                        <th>{% trans "Total" %}</th>
+                                        <th>₹{{ form.instance.amount|floatformat:2 }}</th>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <p class="mt-2 mb-0">
+                            <small class="text-muted">
+                                <strong>{% trans "To edit this payment:" %}</strong><br>
+                                • {% trans "Change the amount above if needed" %}<br>
+                                • {% trans "Check 'Distribute across multiple months' below to change which months receive the payment" %}<br>
+                                • {% trans "Select the new months you want to allocate to" %}<br>
+                                • {% trans "The system will automatically redistribute the (possibly new) amount across your selected months" %}
+                            </small>
+                        </p>
+                    </div>
+                    {% endif %}
+                    
                     <div class="alert alert-warning mt-2 multi-month-info" style="display: none;">
                         <i class="fas fa-exclamation-triangle"></i> {% trans "When distributing across multiple months, the payment will be allocated to the selected months only. The month and year selectors above will be ignored." %}
                     </div>
@@ -111,6 +164,12 @@
                                 
                                 <div id="unpaid-months-content">
                                     {% if form.unpaid_months %}
+                                    {% if form.instance.pk %}
+                                    <div class="alert alert-info mb-3">
+                                        <i class="fas fa-info-circle"></i> 
+                                        {% trans "Months highlighted in yellow are currently allocated to this payment. You can modify the selection and click 'Update Payment' to redistribute the amount." %}
+                                    </div>
+                                    {% endif %}
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover">
                                             <thead>
@@ -124,13 +183,18 @@
                                             </thead>
                                             <tbody>
                                                 {% for month in form.unpaid_months %}
-                                                <tr>
+                                                <tr{% if month.is_currently_allocated %} class="table-warning"{% endif %}>
                                                     <td>
                                                         <div class="form-check">
-                                                            <input class="form-check-input" type="checkbox" name="selected_months" value="{{ month.month }}_{{ month.year }}" id="month-{{ month.month }}-{{ month.year }}">
+                                                            <input class="form-check-input" type="checkbox" name="selected_months" value="{{ month.month }}_{{ month.year }}" id="month-{{ month.month }}-{{ month.year }}"{% if month.is_currently_allocated %} checked{% endif %}>
                                                         </div>
                                                     </td>
-                                                    <td>{{ month.month_name }} {{ month.year }}</td>
+                                                    <td>
+                                                        {{ month.month_name }} {{ month.year }}
+                                                        {% if month.is_currently_allocated %}
+                                                            <span class="badge bg-warning text-dark ms-1" title="{% trans 'Currently allocated to this payment' %}">{% trans "Current" %}</span>
+                                                        {% endif %}
+                                                    </td>
                                                     <td>₹{{ month.sales_amount|floatformat:2 }}</td>
                                                     <td>₹{{ month.payment_amount|floatformat:2 }}</td>
                                                     <td>₹{{ month.remaining|floatformat:2 }}</td>
@@ -162,7 +226,11 @@
                     </div>
                     
                     <div class="mt-4 text-end">
+                        {% if from_customer_page and customer %}
+                        <a href="{% url 'customer_detail' customer.id %}" class="btn btn-outline-secondary">{% trans "Cancel" %}</a>
+                        {% else %}
                         <a href="{% url 'payment_list' %}" class="btn btn-outline-secondary">{% trans "Cancel" %}</a>
+                        {% endif %}
                         <button type="submit" class="btn btn-primary">
                             {% if form.instance.pk %}{% trans "Update" %}{% else %}{% trans "Save" %}{% endif %} {% trans "Payment" %}
                         </button>
@@ -366,6 +434,15 @@ $(document).ready(function() {
         e.preventDefault();
         $('input[name="selected_months"]').prop('checked', false);
     });
+    
+    // Handle initial state for editing multi-month payments
+    {% if form.instance.pk and is_multi_month_payment %}
+    // If this is an existing multi-month payment, show the existing allocations info
+    $('.existing-allocations-info').show();
+    
+    // Pre-check the multi-month checkbox since this payment has allocations
+    $('#id_is_multi_month').prop('checked', true);
+    {% endif %}
     
     // Trigger the change event to set the initial state
     $('#id_is_multi_month').trigger('change');

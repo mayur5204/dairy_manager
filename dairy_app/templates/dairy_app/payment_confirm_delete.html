@@ -10,9 +10,15 @@
     </h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group me-2">
+            {% if from_customer_page %}
+            <a href="{% url 'customer_detail' object.customer.id %}" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> {% trans "Back to Customer" %}
+            </a>
+            {% else %}
             <a href="{% url 'payment_list' %}" class="btn btn-sm btn-outline-secondary">
                 <i class="fas fa-arrow-left"></i> {% trans "Back to List" %}
             </a>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -49,8 +55,18 @@
                 
                 <form method="post">
                     {% csrf_token %}
+                    
+                    <!-- Hidden field to preserve return destination -->
+                    {% if return_to %}
+                    <input type="hidden" name="return" value="{{ return_to }}">
+                    {% endif %}
+                    
                     <div class="mt-4">
+                        {% if from_customer_page %}
+                        <a href="{% url 'customer_detail' object.customer.id %}" class="btn btn-outline-secondary">{% trans "Cancel" %}</a>
+                        {% else %}
                         <a href="{% url 'payment_list' %}" class="btn btn-outline-secondary">{% trans "Cancel" %}</a>
+                        {% endif %}
                         <button type="submit" class="btn btn-danger">
                             <i class="fas fa-trash"></i> {% trans "Delete Permanently" %}
                         </button>

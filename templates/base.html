@@ -206,6 +206,77 @@
                 padding-bottom: 0;
             }
         }
+        
+        /* 6 Months Status Display */
+        .six-months-status .badge {
+            min-width: 60px;
+            font-size: 0.85rem;
+            padding: 0.5rem 0.25rem;
+        }
+        
+        .six-months-status .month-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .six-months-status .month-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .six-months-status .month-status-overview {
+            border-radius: 8px;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .six-months-status .badge.w-100 {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        /* Status color enhancements */
+        .text-pending {
+            color: #dc3545 !important;
+            font-weight: 600;
+        }
+        
+        .text-paid {
+            color: #28a745 !important;
+            font-weight: 600;
+        }
+        
+        .text-no-sales {
+            color: #6c757d !important;
+        }
+        
+        /* Customer Navigation Enhancements */
+        .customer-navigation .btn {
+            transition: all 0.2s ease;
+        }
+        
+        .customer-navigation .btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .customer-navigation .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .area-info {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        
+        /* Keyboard navigation indicator */
+        .keyboard-hint {
+            font-size: 0.75rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
+        }
     </style>
     
     {% block extra_css %}{% endblock %}

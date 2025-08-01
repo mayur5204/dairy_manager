@@ -6,8 +6,44 @@
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-user text-primary"></i> {{ customer.name }}</h1>
+    <div class="d-flex align-items-center">
+        <h1 class="h2 me-3"><i class="fas fa-user text-primary"></i> {{ customer.name }}</h1>
+        {% if area_name %}
+        <span class="badge bg-info fs-6 me-2">{{ area_name }}</span>
+        <small class="text-muted me-3">({{ area_customer_position }}/{{ area_total_customers }})</small>
+        {% endif %}
+        <a href="{% url 'sale_add' %}?customer={{ customer.id }}" class="btn btn-sm btn-primary me-2">
+            <i class="fas fa-plus-circle"></i> {% trans "New Sale" %}
+        </a>
+        <a href="{% url 'payment_add' %}?customer={{ customer.id }}&amp;return=customer_detail" class="btn btn-sm btn-accent">
+            <i class="fas fa-plus-circle"></i> {% trans "New Payment" %}
+        </a>
+    </div>
     <div class="btn-toolbar mb-2 mb-md-0">
+        <!-- Navigation Buttons -->
+        <div class="btn-group me-2 customer-navigation">
+            {% if previous_customer %}
+            <a href="{% url 'customer_detail' previous_customer.id %}" class="btn btn-sm btn-outline-secondary" title="{% trans 'Previous Customer' %}: {{ previous_customer.name }}">
+                <i class="fas fa-chevron-left"></i> {% trans "Previous" %}
+            </a>
+            {% else %}
+            <button class="btn btn-sm btn-outline-secondary" disabled title="{% trans 'No previous customer in this area' %}">
+                <i class="fas fa-chevron-left"></i> {% trans "Previous" %}
+            </button>
+            {% endif %}
+            
+            {% if next_customer %}
+            <a href="{% url 'customer_detail' next_customer.id %}" class="btn btn-sm btn-outline-secondary" title="{% trans 'Next Customer' %}: {{ next_customer.name }}">
+                {% trans "Next" %} <i class="fas fa-chevron-right"></i>
+            </a>
+            {% else %}
+            <button class="btn btn-sm btn-outline-secondary" disabled title="{% trans 'No next customer in this area' %}">
+                {% trans "Next" %} <i class="fas fa-chevron-right"></i>
+            </button>
+            {% endif %}
+        </div>
+        
+        <!-- Regular Action Buttons -->
         <div class="btn-group me-2">
             <a href="{% url 'customer_list' %}" class="btn btn-sm btn-outline-secondary">
                 <i class="fas fa-arrow-left"></i> {% trans "Back to List" %}
@@ -82,15 +118,6 @@
                     {% trans "No pending balance" %}
                     {% endif %}
                 </p>
-                
-                <div class="btn-group mt-3">
-                    <a href="{% url 'sale_add' %}?customer={{ customer.id }}" class="btn btn-sm btn-primary">
-                        <i class="fas fa-plus-circle"></i> {% trans "Record Sale" %}
-                    </a>
-                    <a href="{% url 'payment_add' %}?customer={{ customer.id }}" class="btn btn-sm btn-accent">
-                        <i class="fas fa-money-bill"></i> {% trans "Record Payment" %}
-                    </a>
-                </div>
 
                 {% if pending_months %}
                 <div class="mt-3">
@@ -154,12 +181,35 @@
     </div>
     
     <div class="col-md-8">
-        <!-- Monthly Balance Status -->
+        <!-- Last 6 Months Balance Status -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-history me-2"></i> {% trans "Monthly Balance Status" %}</h5>
+                <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i> {% trans "Last 6 Months Balance Status" %}</h5>
             </div>
-            <div class="card-body">
+            <div class="card-body six-months-status">
+                {% if last_six_months_status %}
+                <!-- Quick Status Overview -->
+                <div class="row mb-3">
+                    {% for month_status in last_six_months_status %}
+                    <div class="col-md-2 col-4 mb-2">
+                        <div class="text-center month-card">
+                            <div class="badge bg-{{ month_status.status_class }} w-100 mb-1" title="{{ month_status.month_name }} {{ month_status.year }} - {{ month_status.status_text }}">
+                                {{ month_status.month_short }}
+                            </div>
+                            <small class="text-muted d-block">{{ month_status.year }}</small>
+                            {% if month_status.balance > 0 %}
+                            <small class="text-pending">₹{{ month_status.balance|floatformat:0 }}</small>
+                            {% elif month_status.balance < 0 %}
+                            <small class="text-paid">₹{{ month_status.balance|floatformat:0 }}</small>
+                            {% else %}
+                            <small class="text-no-sales">₹0</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Detailed Table -->
                 <div class="table-responsive">
                     <table class="table table-striped table-sm">
                         <thead>
@@ -172,30 +222,28 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for balance in monthly_balances %}
+                            {% for month_status in last_six_months_status %}
                             <tr>
-                                <td>{{ balance.month|month_name }} {{ balance.year }}</td>
-                                <td>₹{{ balance.sales_amount|floatformat:2 }}</td>
-                                <td>₹{{ balance.payment_amount|floatformat:2 }}</td>
-                                <td>₹{{ balance.sales_amount|sub:balance.payment_amount|floatformat:2 }}</td>
-                                <td>
-                                    {% if balance.is_paid %}
-                                    <span class="badge bg-success">{% trans "Paid" %}</span>
-                                    {% elif balance.sales_amount == 0 %}
-                                    <span class="badge bg-secondary">{% trans "No Sales" %}</span>
-                                    {% else %}
-                                    <span class="badge bg-danger">{% trans "Pending" %}</span>
-                                    {% endif %}
+                                <td><strong>{{ month_status.month_name }} {{ month_status.year }}</strong></td>
+                                <td>₹{{ month_status.sales_amount|floatformat:2 }}</td>
+                                <td>₹{{ month_status.payment_amount|floatformat:2 }}</td>
+                                <td class="{% if month_status.balance > 0 %}text-pending{% elif month_status.balance < 0 %}text-paid{% else %}text-no-sales{% endif %}">
+                                    <strong>₹{{ month_status.balance|floatformat:2 }}</strong>
                                 </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="5" class="text-center">{% trans "No monthly balance records found" %}</td>
+                                <td>
+                                    <span class="badge bg-{{ month_status.status_class }}">{{ month_status.status_text }}</span>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
+                {% else %}
+                <div class="text-center text-muted">
+                    <i class="fas fa-info-circle fa-2x mb-2"></i>
+                    <p>{% trans "No monthly balance data available" %}</p>
+                </div>
+                {% endif %}
             </div>
         </div>
         
@@ -387,9 +435,14 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="fas fa-money-bill me-2"></i> {% trans "Recent Payments" %}</h5>
-                <a href="{% url 'payment_add' %}?customer={{ customer.id }}" class="btn btn-sm btn-accent">
-                    <i class="fas fa-plus-circle"></i> {% trans "New Payment" %}
-                </a>
+                <div class="btn-group">
+                    <a href="{% url 'sale_add' %}?customer={{ customer.id }}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus-circle"></i> {% trans "New Sale" %}
+                    </a>
+                    <a href="{% url 'payment_add' %}?customer={{ customer.id }}" class="btn btn-sm btn-accent">
+                        <i class="fas fa-plus-circle"></i> {% trans "New Payment" %}
+                    </a>
+                </div>
             </div>
             <div class="card-body p-0">
                 {% if recent_payments %}
@@ -399,6 +452,7 @@
                             <tr>
                                 <th>{% trans "Date" %}</th>
                                 <th>{% trans "Amount" %}</th>
+                                <th>{% trans "Type" %}</th>
                                 <th>{% trans "Description" %}</th>
                                 <th>{% trans "Actions" %}</th>
                             </tr>
@@ -408,13 +462,28 @@
                             <tr>
                                 <td>{{ payment.date|date:"d M, Y" }}</td>
                                 <td>₹{{ payment.amount|floatformat:2 }}</td>
+                                <td>
+                                    {% if payment.allocations.exists %}
+                                    <span class="badge bg-info" title="{% trans 'This payment is distributed across multiple months' %}">
+                                        <i class="fas fa-layer-group"></i> {% trans "Multi-month" %}
+                                    </span>
+                                    {% elif payment.payment_for_month and payment.payment_for_year %}
+                                    <span class="badge bg-success" title="{{ payment.payment_for_month|month_name }} {{ payment.payment_for_year }}">
+                                        <i class="fas fa-calendar"></i> {{ payment.payment_for_month|month_name|truncatechars:3 }} {{ payment.payment_for_year }}
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-secondary" title="{% trans 'No specific month assigned' %}">
+                                        <i class="fas fa-question"></i> {% trans "General" %}
+                                    </span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ payment.description|default:"--" }}</td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
-                                        <a href="{% url 'payment_edit' payment.id %}" class="btn btn-outline-primary">
+                                        <a href="{% url 'payment_edit' payment.id %}?return=customer_detail" class="btn btn-outline-primary">
                                             <i class="fas fa-edit"></i>
                                         </a>
-                                        <a href="{% url 'payment_delete' payment.id %}" class="btn btn-outline-danger">
+                                        <a href="{% url 'payment_delete' payment.id %}?return=customer_detail" class="btn btn-outline-danger">
                                             <i class="fas fa-trash"></i>
                                         </a>
                                     </div>
@@ -428,7 +497,7 @@
                 <div class="text-center py-4">
                     <i class="fas fa-money-bill fa-3x text-muted mb-3"></i>
                     <p>{% trans "No payment records found for this customer" %}</p>
-                    <a href="{% url 'payment_add' %}?customer={{ customer.id }}" class="btn btn-accent">
+                    <a href="{% url 'payment_add' %}?customer={{ customer.id }}&amp;return=customer_detail" class="btn btn-accent">
                         <i class="fas fa-plus-circle"></i> {% trans "Record First Payment" %}
                     </a>
                 </div>
@@ -437,4 +506,52 @@
         </div>
     </div>
 </div>
+
+<!-- Add keyboard navigation -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Keyboard navigation
+    document.addEventListener('keydown', function(e) {
+        // Only handle if not typing in an input field
+        if (e.target.tagName.toLowerCase() === 'input' || 
+            e.target.tagName.toLowerCase() === 'textarea' ||
+            e.target.tagName.toLowerCase() === 'select') {
+            return;
+        }
+        
+        // Left arrow or 'P' key for previous customer
+        if ((e.key === 'ArrowLeft' || e.key.toLowerCase() === 'p') && !e.ctrlKey && !e.altKey) {
+            {% if previous_customer %}
+            e.preventDefault();
+            window.location.href = "{% url 'customer_detail' previous_customer.id %}";
+            {% endif %}
+        }
+        
+        // Right arrow or 'N' key for next customer
+        if ((e.key === 'ArrowRight' || e.key.toLowerCase() === 'n') && !e.ctrlKey && !e.altKey) {
+            {% if next_customer %}
+            e.preventDefault();
+            window.location.href = "{% url 'customer_detail' next_customer.id %}";
+            {% endif %}
+        }
+        
+        // Escape key to go back to customer list
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            window.location.href = "{% url 'customer_list' %}";
+        }
+    });
+    
+    // Add keyboard hint to navigation buttons
+    {% if previous_customer or next_customer %}
+    const navigationDiv = document.querySelector('.btn-toolbar .btn-group:first-child');
+    if (navigationDiv) {
+        const hint = document.createElement('div');
+        hint.className = 'keyboard-hint text-center mt-1';
+        hint.innerHTML = '{% trans "Use ←→ arrow keys or P/N to navigate" %}';
+        navigationDiv.appendChild(hint);
+    }
+    {% endif %}
+});
+</script>
 {% endblock %}
