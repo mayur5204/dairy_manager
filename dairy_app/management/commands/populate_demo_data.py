@@ -42,7 +42,7 @@ class Command(BaseCommand):
                 
                 if customers:
                     self.generate_sales_for_last_two_months(customers, admin_user)
-                    self.generate_partial_payments(customers, admin_user)
+                    # Skip payment generation - only create sales data
                     self.print_summary()
                 
         except Exception as e:
@@ -313,21 +313,14 @@ class Command(BaseCommand):
             customer_count = area.customers.count()
             self.stdout.write(f'  - {area.name}: {customer_count} customers')
         
-        # Sales & Payments
+        # Sales only (no payments)
         total_sales = Sale.objects.count()
         sales_amount = Sale.objects.aggregate(
             total=models.Sum(models.F('quantity') * models.F('rate'))
         )['total'] or Decimal('0')
         
-        total_payments = Payment.objects.count()
-        payment_amount = Payment.objects.aggregate(
-            total=models.Sum('amount')
-        )['total'] or Decimal('0')
-        
-        outstanding = sales_amount - payment_amount
-        
         self.stdout.write(f'\nSales records: {total_sales} (₹{sales_amount})')
-        self.stdout.write(f'Payments: {total_payments} (₹{payment_amount})')
-        self.stdout.write(f'Outstanding: ₹{outstanding}')
+        self.stdout.write(f'Payments: 0 (₹0) - Payment generation skipped')
+        self.stdout.write(f'Outstanding: ₹{sales_amount}')
         
         self.stdout.write(self.style.SUCCESS('\n✅ Demo data population completed!'))

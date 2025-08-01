@@ -4,7 +4,6 @@ This guide explains how to populate your dairy management system with demo data 
 - 2 Areas: Ganesh Colony and Prem Nagar
 - 60 Customers (30 in each area)
 - Sales data for the last 2 months
-- Partial payment records
 
 ## Prerequisites
 
@@ -98,16 +97,14 @@ python populate_areas_customers_sales.py
 - **Daily Probability**: 80% chance of getting each milk type per day
 
 ### 💰 Payment Data:
-- **Coverage**: 60% of customers make payments
-- **Amount**: 30-80% of their total outstanding amount
-- **Timing**: Random dates in the last month
+- **No payments are generated** - All customers will have outstanding balances equal to their total sales
 
 ## Expected Results:
 
 After running the script, you should see:
 - **~3,000-4,000 sales records** for 2 months
-- **~36 payment records** (60% of 60 customers)
-- **Realistic outstanding balances** for most customers
+- **0 payment records** (payments are not generated)
+- **Outstanding balances equal to total sales** for all customers
 - **Area-wise customer distribution**
 
 ## Sample Output:
@@ -126,8 +123,6 @@ Creating areas and customers...
 Generating sales data for last two months...
 Generating for 6/2025 and 7/2025
 ✅ Created 3847 sales records
-Generating partial payments...
-✅ Created 36 payments
 
 ============================================================
 DATA CREATION SUMMARY
@@ -137,8 +132,8 @@ Areas: 2
   - Prem Nagar: 30 customers
 
 Sales records: 3847 (₹245,678.50)
-Payments: 36 (₹134,521.25)
-Outstanding: ₹111,157.25
+Payments: 0 (₹0) - Payment generation skipped
+Outstanding: ₹245,678.50
 
 ✅ Demo data population completed!
 ```
@@ -160,7 +155,6 @@ To modify the script for your needs:
 2. **Adjust milk prices** - Modify the `rate_per_liter` values in `create_milk_types()`
 3. **Change time period** - Modify the month calculation logic in `generate_sales_for_last_two_months()`
 4. **Adjust quantities** - Change the `random.uniform()` ranges for different milk types
-5. **Payment percentages** - Modify the payment logic in `generate_partial_payments()`
 
 ## Troubleshooting:
 
