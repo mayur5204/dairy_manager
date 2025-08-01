@@ -2330,7 +2330,7 @@ def generate_customer_bill(request, pk):
         milk_type_summary[milk_type_name]['amount'] += sale.quantity * sale.rate
     
     # Path to the PDF template - using the provided template
-    template_path = os.path.join(settings.BASE_DIR, 'bill.pdf')
+    template_path = os.path.join(settings.BASE_DIR, 'new_bill.pdf')
     
     # Check if template exists
     if not os.path.exists(template_path):
