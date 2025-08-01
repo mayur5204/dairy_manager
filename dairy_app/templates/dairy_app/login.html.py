@@ -1,0 +1,46 @@
+BBBBBBB BBBBBBBBBBB
+BBBB BBBB
+
+BBBBB BBBBB gettext(u'Login')  X  gettext(u'Shree Trimurti Dairy') BBBBBBBB
+
+BBBBB BBBBBBB
+XXXX XXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXX
+    XXXX XXXXXXXXXXXXXXX XXXXXXXXXX
+        XXXX XXXXXXXXXXX XXXXXXXX
+            XXXX XXXXXXXXXXXXXXXXXX XXXXXXXXXXX XXXXXX
+                XXX XXXXXXXXXXXXXXX XXXXXXXXXX XXXXXXXXXXXXXXXXXXXX  gettext(u'Login to Shree Trimurti Dairy') XXXXX
+            XXXXXX
+            XXXX XXXXXXXXXXXXXXXX XXXXX
+                XXXXX XXXXXXXXXXXXXX
+                    BBBBBBBBBB
+                    
+                    XXXX XXXXXXXXXXXXX
+                        XXXXXX XXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXX gettext(u'Username') XXXXXXXXX
+                        XXXX XXXXXXXXXXXXXXXXXXXX
+                            XXXXX XXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXX XXXXXXXXXXXXXXXXXXXX
+                            XXXXXX XXXXXXXXXXX XXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXX XXXXXXXX XXXXXXXXXX
+                        XXXXXX
+                    XXXXXX
+                    
+                    XXXX XXXXXXXXXXXXX
+                        XXXXXX XXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXX gettext(u'Password') XXXXXXXXX
+                        XXXX XXXXXXXXXXXXXXXXXXXX
+                            XXXXX XXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXX XXXXXXXXXXXXXXXXXXXX
+                            XXXXXX XXXXXXXXXXXXXXX XXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXX XXXXXXXXX
+                        XXXXXX
+                    XXXXXX
+                    
+                    XXXX XXXXXXXXXXXXX XXXXXXX
+                        XXXXXXX XXXXXXXXXXXXX XXXXXXXXXX XXXXXXXXXXX XXXXXX
+                            XX XXXXXXXXXX XXXXXXXXXXXXXX XXXXXXXXXX  gettext(u'Login') 
+                        XXXXXXXXX
+                    XXXXXX
+                XXXXXXX
+            XXXXXX
+            XXXX XXXXXXXXXXXXXXXXXX XXXXXXXXXXX XXXXXX
+                XX XXXXXXXXXXXXX gettext(u'Contact your system administrator for access.') XXXX
+            XXXXXX
+        XXXXXX
+    XXXXXX
+XXXXXX
+BBBBBBBB
