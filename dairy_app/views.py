@@ -2276,9 +2276,13 @@ def generate_customer_bill(request, pk):
     """Generate a PDF bill for a specific customer using a template PDF"""
     import os
     from django.conf import settings
-    from PyPDF2 import PdfReader, PdfWriter
     from reportlab.lib.units import inch, cm
     from reportlab.pdfgen import canvas
+    
+    # Check if PyPDF2 is available
+    if not PYPDF2_AVAILABLE:
+        messages.error(request, _('PDF generation is not available. PyPDF2 is not installed.'))
+        return redirect('customer_detail', pk=pk)
     
     customer = get_object_or_404(Customer, pk=pk)
     
@@ -2362,7 +2366,6 @@ def generate_customer_bill(request, pk):
         from reportlab.pdfbase.ttfonts import TTFont
         from reportlab.lib.pagesizes import A4
         from reportlab.pdfgen import canvas
-        from PyPDF2 import PdfReader, PdfWriter
         from io import BytesIO
     except ImportError as e:
         messages.error(request, f"PDF generation libraries not installed: {e}")

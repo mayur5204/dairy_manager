@@ -159,6 +159,31 @@ python manage.py migrate
 ### Error: "DisallowedHost"
 **Solution:** Check `ALLOWED_HOSTS` in settings.py includes `'mr0264.pythonanywhere.com'`
 
+### Error: "No module named 'PyPDF2'" (PDF Generation)
+**Problem:** Customer bill generation fails with PyPDF2 import error
+
+**Solutions:**
+1. **Install PyPDF2:**
+   ```bash
+   cd ~/dairy_manager
+   source venv/bin/activate
+   pip install PyPDF2==3.0.1
+   ```
+
+2. **Check installation:**
+   ```bash
+   python manage.py check_pdf_dependencies
+   ```
+
+3. **Alternative - Use newer pypdf:**
+   ```bash
+   pip uninstall PyPDF2
+   pip install pypdf==4.0.2
+   # Then update views.py to use: from pypdf import PdfReader, PdfWriter
+   ```
+
+**Note:** The app has been updated to handle missing PyPDF2 gracefully - users will see an error message instead of a crash.
+
 ## Code Changes Made:
 1. ✅ Added conditional imports for reportlab and PyPDF2
 2. ✅ Added mysqlclient to requirements.txt
