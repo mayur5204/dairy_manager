@@ -541,17 +541,6 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.href = "{% url 'customer_list' %}";
         }
     });
-    
-    // Add keyboard hint to navigation buttons
-    {% if previous_customer or next_customer %}
-    const navigationDiv = document.querySelector('.btn-toolbar .btn-group:first-child');
-    if (navigationDiv) {
-        const hint = document.createElement('div');
-        hint.className = 'keyboard-hint text-center mt-1';
-        hint.innerHTML = '{% trans "Use ←→ arrow keys or P/N to navigate" %}';
-        navigationDiv.appendChild(hint);
-    }
-    {% endif %}
 });
 </script>
 {% endblock %}
