@@ -11,18 +11,30 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponseRedirect, JsonResponse, HttpResponse
 from django.utils.translation import gettext_lazy as _
 
-# Import ReportLab for PDF generation
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4, letter
-from reportlab.lib.units import cm, inch, mm
-from reportlab.lib import colors
-from reportlab.platypus import Table, TableStyle
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+# Import ReportLab for PDF generation conditionally
+try:
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import A4, letter
+    from reportlab.lib.units import cm, inch, mm
+    from reportlab.lib import colors
+    from reportlab.platypus import Table, TableStyle
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+
 from io import BytesIO
 import os
 import tempfile
-from PyPDF2 import PdfReader, PdfWriter
+
+# Import PyPDF2 conditionally
+try:
+    from PyPDF2 import PdfReader, PdfWriter
+    PYPDF2_AVAILABLE = True
+except ImportError:
+    PYPDF2_AVAILABLE = False
+
 from django.conf import settings
 
 from .models import MilkType, Customer, Sale, Payment, Area, MonthlyBalance
@@ -2021,8 +2033,14 @@ def download_customer_data(request):
     month_name = _(start_date.strftime('%B'))
     filename = f"customer_data_{month_name}_{selected_year}"
     
+    # Check if xlwt is available
+    try:
+        import xlwt
+    except ImportError:
+        messages.error(request, "Excel export library (xlwt) not installed. Please contact administrator.")
+        return redirect('customer_export')
+    
     # For Excel export
-    import xlwt
     
     # Create workbook and add sheet
     wb = xlwt.Workbook(encoding='utf-8')
@@ -2335,7 +2353,19 @@ def generate_customer_bill(request, pk):
     # Check if template exists
     if not os.path.exists(template_path):
         # If template doesn't exist, return an error
-        messages.error(request, "Bill template not found. Please ensure 'Dairy_bill1.pdf' is in the project root directory.")
+        messages.error(request, "Bill template not found. Please ensure 'new_bill.pdf' is in the project root directory.")
+        return redirect('customer_detail', pk=pk)
+    
+    # Check if reportlab is available
+    try:
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfgen import canvas
+        from PyPDF2 import PdfReader, PdfWriter
+        from io import BytesIO
+    except ImportError as e:
+        messages.error(request, f"PDF generation libraries not installed: {e}")
         return redirect('customer_detail', pk=pk)
     
     # Create a buffer for our data layer

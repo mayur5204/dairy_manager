@@ -6,9 +6,15 @@ from django.utils.translation import gettext_lazy as _
 from decimal import Decimal
 import datetime
 from calendar import month_name
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 import os
+
+# Import reportlab conditionally to avoid deployment errors
+try:
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
 
 class Area(models.Model):
     """Model representing a delivery area or zone."""
