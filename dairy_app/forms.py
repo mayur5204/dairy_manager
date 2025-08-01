@@ -66,9 +66,12 @@ class CustomerForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         
-        # Only show areas created by this user
+        # Show areas based on user permissions - all areas for superusers, only own areas for regular users
         if self.user:
-            self.fields['area'].queryset = Area.objects.filter(user=self.user)
+            if self.user.is_superuser:
+                self.fields['area'].queryset = Area.objects.all()
+            else:
+                self.fields['area'].queryset = Area.objects.filter(user=self.user)
         
         # Ensure labels can be translated
         from django.utils.translation import gettext_lazy as _

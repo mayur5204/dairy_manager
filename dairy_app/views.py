@@ -58,8 +58,11 @@ def dashboard_view(request):
     # Get customers count
     customers_count = Customer.objects.all().count()
     
-    # Get areas count
-    areas_count = Area.objects.filter(user=request.user).count()
+    # Get areas count - show all areas for superusers, only own areas for regular users
+    if request.user.is_superuser:
+        areas_count = Area.objects.all().count()
+    else:
+        areas_count = Area.objects.filter(user=request.user).count()
     
     # Get recent activities
     recent_sales = Sale.objects.order_by('-created_at')[:5]  # Order by creation time
@@ -175,7 +178,9 @@ class AreaListView(LoginRequiredMixin, ListView):
     context_object_name = 'areas'
     
     def get_queryset(self):
-        # Show areas for current user
+        # Show all areas for superusers, only own areas for regular users
+        if self.request.user.is_superuser:
+            return Area.objects.all()
         return Area.objects.filter(user=self.request.user)
 
     def get_context_data(self, **kwargs):
@@ -211,7 +216,9 @@ class AreaUpdateView(LoginRequiredMixin, UpdateView):
     success_url = reverse_lazy('area_list')
     
     def get_queryset(self):
-        # Only allow users to edit their own areas
+        # Allow superusers to edit all areas, regular users only their own
+        if self.request.user.is_superuser:
+            return Area.objects.all()
         return Area.objects.filter(user=self.request.user)
     
     def get_form_kwargs(self):
@@ -230,7 +237,9 @@ class AreaDeleteView(LoginRequiredMixin, DeleteView):
     success_url = reverse_lazy('area_list')
     
     def get_queryset(self):
-        # Only allow users to delete their own areas
+        # Allow superusers to delete all areas, regular users only their own
+        if self.request.user.is_superuser:
+            return Area.objects.all()
         return Area.objects.filter(user=self.request.user)
     
     def delete(self, request, *args, **kwargs):
@@ -242,7 +251,11 @@ class AreaDeleteView(LoginRequiredMixin, DeleteView):
 @login_required
 def area_customers_view(request, pk):
     """View customers for a specific area"""
-    area = get_object_or_404(Area, pk=pk, user=request.user)
+    # Allow superusers to access all areas, regular users only their own
+    if request.user.is_superuser:
+        area = get_object_or_404(Area, pk=pk)
+    else:
+        area = get_object_or_404(Area, pk=pk, user=request.user)
     customers = Customer.objects.filter(area=area).order_by('date_joined')  # Sort by creation time for milk distribution route
     
     context = {
@@ -383,8 +396,11 @@ class CustomerListView(LoginRequiredMixin, ListView):
             for customer in context['customers']:
                 customer.highlighted_name = self.highlight_text(customer.name, search_query)
         
-        # Add areas for filtering
-        areas = Area.objects.filter(user=self.request.user)
+        # Add areas for filtering - show all areas for superusers, only own areas for regular users
+        if self.request.user.is_superuser:
+            areas = Area.objects.all()
+        else:
+            areas = Area.objects.filter(user=self.request.user)
         context['areas'] = areas
         
         # Check if an area filter is active
@@ -795,8 +811,11 @@ class CustomerCreateView(LoginRequiredMixin, CreateView):
         area_id = self.request.GET.get('area')
         if area_id:
             try:
-                # Verify the area exists and belongs to the user
-                area = Area.objects.get(id=area_id, user=self.request.user)
+                # Verify the area exists and belongs to the user (or user is superuser)
+                if self.request.user.is_superuser:
+                    area = Area.objects.get(id=area_id)
+                else:
+                    area = Area.objects.get(id=area_id, user=self.request.user)
                 initial['area'] = area
             except (Area.DoesNotExist, ValueError):
                 # If area doesn't exist or doesn't belong to user, ignore
@@ -812,8 +831,11 @@ class CustomerCreateView(LoginRequiredMixin, CreateView):
         area_id = self.request.GET.get('area')
         if area_id:
             try:
-                # Verify the area exists and belongs to the user
-                area = Area.objects.get(id=area_id, user=self.request.user)
+                # Verify the area exists and belongs to the user (or user is superuser)
+                if self.request.user.is_superuser:
+                    area = Area.objects.get(id=area_id)
+                else:
+                    area = Area.objects.get(id=area_id, user=self.request.user)
                 context['selected_area'] = area
                 context['from_area_page'] = True
             except (Area.DoesNotExist, ValueError):
@@ -829,8 +851,11 @@ class CustomerCreateView(LoginRequiredMixin, CreateView):
         area_id = self.request.GET.get('area')
         if area_id:
             try:
-                # Verify the area exists and belongs to the user
-                Area.objects.get(id=area_id, user=self.request.user)
+                # Verify the area exists and belongs to the user (or user is superuser)
+                if self.request.user.is_superuser:
+                    Area.objects.get(id=area_id)
+                else:
+                    Area.objects.get(id=area_id, user=self.request.user)
                 return reverse_lazy('area_customers', kwargs={'pk': area_id})
             except (Area.DoesNotExist, ValueError):
                 # If area doesn't exist or doesn't belong to user, use default
