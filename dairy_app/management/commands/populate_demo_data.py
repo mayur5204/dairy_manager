@@ -31,12 +31,18 @@ class Command(BaseCommand):
                 if options['clear']:
                     self.clear_existing_data()
                 
+                # Get admin user first
+                admin_user = User.objects.filter(is_superuser=True).first()
+                if not admin_user:
+                    self.stdout.write(self.style.ERROR('❌ No admin user found. Please create a superuser first.'))
+                    return
+                
                 self.create_milk_types()
                 areas, customers = self.create_areas_and_customers()
                 
                 if customers:
-                    self.generate_sales_for_last_two_months(customers)
-                    self.generate_partial_payments(customers)
+                    self.generate_sales_for_last_two_months(customers, admin_user)
+                    self.generate_partial_payments(customers, admin_user)
                     self.print_summary()
                 
         except Exception as e:
@@ -169,7 +175,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'✅ Created {len(all_customers)} customers total'))
         return [ganesh_colony, prem_nagar], all_customers
 
-    def generate_sales_for_last_two_months(self, customers):
+    def generate_sales_for_last_two_months(self, customers, admin_user):
         """Generate sales data for the last two months."""
         self.stdout.write('Generating sales data for last two months...')
         
@@ -236,6 +242,7 @@ class Command(BaseCommand):
                             quantity = round(base_quantity * 4) / 4
                             
                             Sale.objects.create(
+                                user=admin_user,
                                 customer=customer,
                                 milk_type=milk_type,
                                 quantity=Decimal(str(quantity)),
@@ -247,7 +254,7 @@ class Command(BaseCommand):
         
         self.stdout.write(self.style.SUCCESS(f'✅ Created {total_sales} sales records'))
 
-    def generate_partial_payments(self, customers):
+    def generate_partial_payments(self, customers, admin_user):
         """Generate some partial payments."""
         self.stdout.write('Generating partial payments...')
         
@@ -281,6 +288,7 @@ class Command(BaseCommand):
                 payment_date = datetime.date(last_month_year, last_month, payment_day)
                 
                 Payment.objects.create(
+                    user=admin_user,
                     customer=customer,
                     amount=payment_amount,
                     date=payment_date,

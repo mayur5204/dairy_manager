@@ -6,6 +6,16 @@ This guide explains how to populate your dairy management system with demo data 
 - Sales data for the last 2 months
 - Partial payment records
 
+## Prerequisites
+
+**Important**: Before running the demo data population, ensure you have a superuser account created:
+
+```bash
+python manage.py createsuperuser
+```
+
+If you already have a superuser, you can skip this step.
+
 ## Method 1: Using Django Management Command (Recommended)
 
 ### Basic Usage:
@@ -27,6 +37,9 @@ cd /path/to/dairy_manager
 source venv/bin/activate  # Linux/Mac
 # OR
 venv\Scripts\activate  # Windows
+
+# Create superuser if you haven't already
+python manage.py createsuperuser
 
 # Run the command
 python manage.py populate_demo_data --clear
@@ -151,11 +164,12 @@ To modify the script for your needs:
 
 ## Troubleshooting:
 
-### Error: "No admin user found"
+### Error: "No admin user found" or "NOT NULL constraint failed: dairy_app_sale.user_id"
 **Solution:** Create a superuser first:
 ```bash
 python manage.py createsuperuser
 ```
+The demo data population requires a superuser account to associate sales and payments with a user.
 
 ### Error: "MilkType matching query does not exist"
 **Solution:** The script creates milk types automatically, but if you get this error, run:
