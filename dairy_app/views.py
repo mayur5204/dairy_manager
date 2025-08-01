@@ -2330,7 +2330,7 @@ def generate_customer_bill(request, pk):
         milk_type_summary[milk_type_name]['amount'] += sale.quantity * sale.rate
     
     # Path to the PDF template - using the provided template
-    template_path = os.path.join(settings.BASE_DIR, 'Dairy_bill1.pdf')
+    template_path = os.path.join(settings.BASE_DIR, 'bill.pdf')
     
     # Check if template exists
     if not os.path.exists(template_path):
@@ -2498,8 +2498,8 @@ def generate_customer_bill(request, pk):
     
     # Add customer name, month and year
     p2.setFont(font_name if devanagari_font_registered else "Helvetica-Bold", 14)
-    p2.drawString(2*cm, p2_height-3.5*cm, f"{str(_('Customer'))}: {customer.name}")
-    p2.drawString(2*cm, p2_height-4.5*cm, f"{str(_('Month'))}: {month_name} {year}")
+    p2.drawString(2*cm, p2_height-1.2*cm, f"{str(_('Customer'))}: {customer.name}")
+    p2.drawString(2*cm, p2_height-2.0*cm, f"{str(_('Month'))}: {month_name} {year}")
     
     # Calculate days in the selected month
     days_in_month = (end_date - start_date).days + 1
@@ -2526,83 +2526,110 @@ def generate_customer_bill(request, pk):
             unique_milk_types.add(milk_type)
     unique_milk_types = sorted(list(unique_milk_types))
     
-    # Draw the table
-    table_top = p2_height - 6*cm
-    table_left = 2*cm
-    row_height = 0.8*cm
-    col_width = 1.5*cm
-    date_col_width = 2*cm
-    milk_type_col_width = 3*cm
+    # Draw the table with exact template dimensions - adjusted positioning
+    table_top = p2_height - 2.8*cm  # Shifted down by 0.5cm
+    table_left = 1.01*cm + 0.76*cm              # Shifted right by 0.2cm
+    table_bottom = table_top - 17.12*cm        # Exact table height from template
+    table_right = table_left + 18.98*cm        # Exact table width from template
     
-    # Calculate table dimensions based on content
-    table_width = date_col_width + len(unique_milk_types) * col_width
+    # Calculate precise dimensions for 8 columns × 16 rows grid
+    total_rows = 16
+    total_cols = 8
     
-    # Draw table header
-    p2.setFont(font_name if devanagari_font_registered else "Helvetica-Bold", 12)
-    p2.drawString(table_left, table_top, str(_("Day")))
+    # Calculate row height and column width to fit exactly in the grid
+    table_height = table_top - table_bottom
+    table_width = table_right - table_left
     
-    # Draw milk type column headers
-    milk_type_x = table_left + date_col_width
-    for milk_type in unique_milk_types:
-        p2.drawString(milk_type_x, table_top, milk_type)
+    row_height = table_height / total_rows  # Precise row height
+    col_width = table_width / total_cols    # Precise column width
+    
+    # Layout: 2 halves of 4 columns each
+    # Left half: Day + 3 milk types (columns 1-4) for days 1-16
+    # Right half: Day + 3 milk types (columns 5-8) for days 17-31
+    cols_per_half = 4
+    milk_types_per_half = 3  # 3 milk types per half (excluding day column)
+    
+    # Limit milk types to fit in available space (max 3 milk types displayed)
+    displayed_milk_types = list(unique_milk_types)[:milk_types_per_half]
+    
+    # Draw headers for both halves
+    p2.setFont(font_name if devanagari_font_registered else "Helvetica-Bold", 10)
+    
+    # Left half headers (columns 1-4)
+    left_day_x = table_left
+    p2.drawString(left_day_x, table_top, str(_("Day")))
+    
+    milk_type_x = left_day_x + col_width
+    for milk_type in displayed_milk_types:
+        # Truncate long milk type names to fit in column
+        display_name = milk_type[:8] if len(milk_type) > 8 else milk_type
+        # Set bold font for milk type headers
+        p2.setFont(font_name if devanagari_font_registered else "Helvetica-Bold", 10)
+        p2.drawString(milk_type_x, table_top, display_name)
         milk_type_x += col_width
     
-    # Draw horizontal line below header
-    p2.line(table_left, table_top - 0.3*cm, table_left + table_width, table_top - 0.3*cm)
+    # Right half headers (columns 5-8)
+    right_day_x = table_left + (cols_per_half * col_width)
+    p2.drawString(right_day_x, table_top, str(_("Day")))
     
-    # Set up for 2-column layout with fixed 15 days per column
-    # Define column offsets
-    column_offset = p2_width / 2  # Divide the page in half
+    milk_type_x = right_day_x + col_width
+    for milk_type in displayed_milk_types:
+        # Truncate long milk type names to fit in column
+        display_name = milk_type[:8] if len(milk_type) > 8 else milk_type
+        # Set bold font for milk type headers
+        p2.setFont(font_name if devanagari_font_registered else "Helvetica-Bold", 10)
+        p2.drawString(milk_type_x, table_top, display_name)
+        milk_type_x += col_width
     
-    # First column will always have 15 days, second column the remainder
-    days_in_first_column = 15
+
     
-    # Draw the day rows
-    column = 0
-    page = 1
-    row_y = table_top - row_height
+    # Draw the day rows with 2-column layout
+    # Left half: days 1-15 (reserve 1 row for header, 15 rows for data)
+    # Right half: days 16-31
+    max_days_left = 15  # Days 1-15 in left half
     
-    # Draw headers for both columns at the start
-    for col in range(2):
-        col_left = table_left + col * column_offset
-        
-        p2.setFont(font_name if devanagari_font_registered else "Helvetica-Bold", 12)
-        p2.drawString(col_left, table_top, str(_("Day")))
-        
-        milk_type_x = col_left + date_col_width
-        for milk_type in unique_milk_types:
-            p2.drawString(milk_type_x, table_top, milk_type)
-            milk_type_x += col_width
-        
-        p2.line(col_left, table_top - 0.3*cm, col_left + table_width, table_top - 0.3*cm)
+    # Draw left half data (days 1-15)
+    row_y = table_top - row_height  # Start below header
     
-    for day in range(1, days_in_month + 1):
-        # Determine which column this day belongs to
-        if day <= days_in_first_column:
-            column = 0
-            # Maintain vertical position relative to the first day in column
-            row_y = table_top - row_height - ((day - 1) * row_height)
-        else:
-            column = 1
-            # Maintain vertical position relative to the first day in column
-            row_y = table_top - row_height - ((day - days_in_first_column - 1) * row_height)
-            
-        # Calculate current column's left position
-        current_left = table_left + column * column_offset
+    for day in range(1, min(days_in_month + 1, max_days_left + 1)):
+        # Draw day number in first column (left half)
+        p2.setFont(font_name if devanagari_font_registered else "Helvetica", 10)
+        p2.drawString(left_day_x, row_y, str(day))
         
-        # Draw day number
-        p2.setFont(font_name if devanagari_font_registered else "Helvetica", 12)
-        p2.drawString(current_left, row_y, str(day))
-        
-        # Draw milk quantities for each type
-        milk_type_x = current_left + date_col_width
-        for milk_type in unique_milk_types:
+        # Draw milk quantities for each type in left half
+        milk_type_x = left_day_x + col_width
+        for milk_type in displayed_milk_types:
             quantity = 0
             if day in daily_milk_data and milk_type in daily_milk_data[day]:
                 quantity = daily_milk_data[day][milk_type]
             
             if quantity > 0:
-                p2.drawString(milk_type_x, row_y, f"{quantity:.2f}")
+                p2.drawString(milk_type_x, row_y, f"{quantity:.1f}")
+            else:
+                p2.drawString(milk_type_x, row_y, "-")
+            milk_type_x += col_width
+        
+        row_y -= row_height
+    
+    # Draw right half data (days 16-31)
+    row_y = table_top - row_height  # Reset to start below header
+    
+    for day in range(max_days_left + 1, days_in_month + 1):
+        # Draw day number in fifth column (right half)
+        p2.setFont(font_name if devanagari_font_registered else "Helvetica", 10)
+        p2.drawString(right_day_x, row_y, str(day))
+        
+        # Draw milk quantities for each type in right half
+        milk_type_x = right_day_x + col_width
+        for milk_type in displayed_milk_types:
+            quantity = 0
+            if day in daily_milk_data and milk_type in daily_milk_data[day]:
+                quantity = daily_milk_data[day][milk_type]
+            
+            if quantity > 0:
+                p2.drawString(milk_type_x, row_y, f"{quantity:.1f}")
+            else:
+                p2.drawString(milk_type_x, row_y, "-")
             milk_type_x += col_width
         
         row_y -= row_height
