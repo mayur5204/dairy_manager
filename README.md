@@ -324,4 +324,4 @@ If you encounter any issues or have questions:
 
 ---
 
-**Made with ❤️ for the dairy industry**
+**Made with ❤️ for the Trimurti Dairy**
