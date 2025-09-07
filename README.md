@@ -15,7 +15,7 @@ A comprehensive web-based dairy management system built with Django to streamlin
 - **Multi-milk Type Support**: Configure different milk types (Cow, Buffalo, etc.) per customer
 
 ### 💰 Sales & Inventory Tracking
-- **Daily Sales Recording**: Quick and efficient milk sales entry with batch processing
+- **Daily Sales Recording**: Quick and efficient milk sales entry.
 - **Multi-milk Type Sales**: Handle different milk varieties with automatic rate calculation
 - **Real-time Inventory**: Track daily milk sales and delivery quantities
 - **Quick Customer Search**: Fast customer selection with auto-complete functionality
