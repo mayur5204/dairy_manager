@@ -293,10 +293,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👨‍💻 Author
 
-**Mayur Rajebhosale**
+**Mayur Patil**
 - GitHub: [@mayur5204](https://github.com/mayur5204)
-- LinkedIn: [Mayur Rajebhosale](https://linkedin.com/in/mayur-rajebhosale)
-
+- 
 ## 🙏 Acknowledgments
 
 - Django community for the excellent framework
